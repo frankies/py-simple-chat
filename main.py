@@ -62,7 +62,7 @@ def reg():
         ip_limit[ip] = {'date': today, 'count': 0}
     ip_data = ip_limit[ip]
     if ip_data['date'] == today:
-        if ip_data['count'] >= 2:
+        if ip_data['count'] >= 100:
             return jsonify({'ok':0, 'msg':'当前IP今日注册已达上限'})
         ip_data['count'] += 1
     else:

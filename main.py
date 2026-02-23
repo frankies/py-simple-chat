@@ -1,101 +1,199 @@
-from flask import Flask
-from endpoints import api_bp
-
+from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
+import json
+import os
+import re
+from datetime import datetime
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'super_chat_123'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
+USER_FILE = 'users.json'
+FRIEND_FILE = 'friends.json'
+IP_LIMIT_FILE = 'ip_limit.json'
+BAN_FILE = 'banned.json'
 
-app.register_blueprint(api_bp)
+def load_json(path, default):
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return default
 
+def save_json(path, data):
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False)
 
-@app.get("/")
-def read_root():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Vercel + Flask</title>
-        <link rel="icon" type="image/svg+xml" href="/favicon.ico">
-        <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-                background-color: #000000; color: #ffffff; line-height: 1.6; min-height: 100vh;
-                display: flex; flex-direction: column;
-            }
-            header { border-bottom: 1px solid #333333; padding: 0; }
-            nav { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; padding: 1rem 2rem; gap: 2rem; }
-            .logo { font-size: 1.25rem; font-weight: 600; color: #ffffff; text-decoration: none; }
-            .nav-links { display: flex; gap: 1.5rem; margin-left: auto; }
-            .nav-links a { text-decoration: none; color: #888888; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.2s ease; font-size: 0.875rem; font-weight: 500; }
-            .nav-links a:hover { color: #ffffff; background-color: #111111; }
-            main { flex: 1; max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; display: flex; flex-direction: column; align-items: center; text-align: center; }
-            .hero { margin-bottom: 3rem; }
-            .hero-code { margin-top: 2rem; width: 100%; max-width: 900px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-            .hero-code pre { background-color: #0a0a0a; border: 1px solid #333333; border-radius: 8px; padding: 1.5rem; text-align: left; grid-column: 1 / -1; }
-            h1 { font-size: 3rem; font-weight: 700; margin-bottom: 1rem; background: linear-gradient(to right, #ffffff, #888888); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-            .subtitle { font-size: 1.25rem; color: #888888; margin-bottom: 2rem; max-width: 600px; }
-            .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; width: 100%; max-width: 900px; }
-            .card { background-color: #111111; border: 1px solid #333333; border-radius: 8px; padding: 1.5rem; transition: all 0.2s ease; text-align: left; }
-            .card:hover { border-color: #555555; transform: translateY(-2px); }
-            .card h3 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; color: #ffffff; }
-            .card p { color: #888888; font-size: 0.875rem; margin-bottom: 1rem; }
-            .card a { display: inline-flex; align-items: center; color: #ffffff; text-decoration: none; font-size: 0.875rem; font-weight: 500; padding: 0.5rem 1rem; background-color: #222222; border-radius: 6px; border: 1px solid #333333; transition: all 0.2s ease; }
-            .card a:hover { background-color: #333333; border-color: #555555; }
-            .status-badge { display: inline-flex; align-items: center; gap: 0.5rem; background-color: #0070f3; color: #ffffff; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; margin-bottom: 2rem; }
-            .status-dot { width: 6px; height: 6px; background-color: #00ff88; border-radius: 50%; }
-            pre { background-color: #0a0a0a; border: 1px solid #333333; border-radius: 6px; padding: 1rem; overflow-x: auto; margin: 0; }
-            code { font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.5; color: #ffffff; }
-            .keyword { color: #ff79c6; }
-            .string { color: #f1fa8c; }
-            .function { color: #50fa7b; }
-            .class { color: #8be9fd; }
-            .module { color: #8be9fd; }
-            .variable { color: #f8f8f2; }
-            .decorator { color: #ffb86c; }
-            @media (max-width: 768px) {
-                nav { padding: 1rem; flex-direction: column; gap: 1rem; }
-                .nav-links { margin-left: 0; }
-                main { padding: 2rem 1rem; }
-                h1 { font-size: 2rem; }
-                .hero-code { grid-template-columns: 1fr; }
-                .cards { grid-template-columns: 1fr; }
-            }
-        </style>
-    </head>
-    <body>
-        <header>
-            <nav>
-                <a href="/" class="logo">Vercel + Flask</a>
-                <div class="nav-links">
-                    <a href="/api/data">API</a>
-                </div>
-            </nav>
-        </header>
-        <main>
-            <div class="hero">
-                <h1>Vercel + Flask</h1>
-                <div class="hero-code">
-                    <pre><code><span class="keyword">from</span> <span class="module">flask</span> <span class="keyword">import</span> <span class="class">Flask</span>
+users = load_json(USER_FILE, {})
+friends = load_json(FRIEND_FILE, {})
+ip_limit = load_json(IP_LIMIT_FILE, {})
+banned = load_json(BAN_FILE, {})  # 封号列表
+requests = {}
+online_users = {}
+mute_users = {}  # 禁言列表
 
-<span class="variable">app</span> = <span class="class">Flask</span>(<span class="string">__name__</span>)
+# 【这里设置管理员用户名】
+ADMIN = "admin"
 
-<span class="decorator">@app.get</span>(<span class="string">"/"</span>)
-<span class="keyword">def</span> <span class="function">read_root</span>():
-    <span class="keyword">return</span> {<span class="string">"Python"</span>: <span class="string">"on Vercel"</span>}</code></pre>
-                </div>
-            </div>
+# ======================
+# 注册
+# ======================
+@app.route('/reg', methods=['POST'])
+def reg():
+    user = request.form.get('user', '').strip()
+    pwd = request.form.get('pwd', '').strip()
+    ip = request.remote_addr
 
-            <div class="cards">
-                <div class="card">
-                    <h3>Sample Data</h3>
-                    <p>Access sample JSON data through our REST API. Perfect for testing and development purposes.</p>
-                    <a href="/api/data">Get Data →</a>
-                </div>
-            </div>
-        </main>
-    </body>
-    </html>
-    """
+    if not user or not pwd:
+        return jsonify({'ok':0, 'msg':'用户名或密码不能为空'})
+    if len(user) < 2 or len(user) > 12:
+        return jsonify({'ok':0, 'msg':'用户名长度 2-12 位'})
+    if user.isdigit():
+        return jsonify({'ok':0, 'msg':'用户名不能是纯数字'})
+    if not re.match(r'^[a-zA-Z0-9_\u4e00-\u9fa5]+$', user):
+        return jsonify({'ok':0, 'msg':'用户名不能包含特殊符号'})
+    if len(pwd) < 4:
+        return jsonify({'ok':0, 'msg':'密码至少4位'})
+    if user in users:
+        return jsonify({'ok':0, 'msg':'用户名已被注册'})
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    if ip not in ip_limit:
+        ip_limit[ip] = {'date': today, 'count': 0}
+    ip_data = ip_limit[ip]
+    if ip_data['date'] == today:
+        if ip_data['count'] >= 2:
+            return jsonify({'ok':0, 'msg':'当前IP今日注册已达上限'})
+        ip_data['count'] += 1
+    else:
+        ip_limit[ip] = {'date': today, 'count': 1}
+    save_json(IP_LIMIT_FILE, ip_limit)
+
+    users[user] = pwd
+    if user not in friends:
+        friends[user] = []
+    save_json(USER_FILE, users)
+    save_json(FRIEND_FILE, friends)
+    return jsonify({'ok':1, 'msg':'注册成功'})
+
+# ======================
+# 登录
+# ======================
+@app.route('/login', methods=['POST'])
+def login():
+    user = request.form.get('user')
+    pwd = request.form.get('pwd')
+    if user in banned:
+        return jsonify({'ok':0, 'msg':'您已被封禁'})
+    if users.get(user) == pwd:
+        return jsonify({'ok':1, 'msg':'登录成功'})
+    return jsonify({'ok':0, 'msg':'账号或密码错误'})
+
+# ======================
+# 管理员：禁言、踢人、封号
+# ======================
+@socketio.on('admin_action')
+def admin_action(data):
+    operator = data.get('admin')
+    target = data.get('target')
+    action = data.get('action')
+
+    if operator != ADMIN:
+        return
+
+    if action == 'kick':
+        if target in online_users:
+            emit('kicked', {}, room=online_users[target])
+    elif action == 'mute':
+        mute_users[target] = True
+        emit('msg_sys', f'【系统】{target} 已被禁言', broadcast=True)
+    elif action == 'unmute':
+        mute_users[target] = False
+        emit('msg_sys', f'【系统】{target} 已解除禁言', broadcast=True)
+    elif action == 'ban':
+        banned[target] = True
+        save_json(BAN_FILE, banned)
+        if target in online_users:
+            emit('banned', {}, room=online_users[target])
+        emit('msg_sys', f'【系统】{target} 已被封号', broadcast=True)
+
+# ======================
+# 聊天
+# ======================
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@socketio.on('join')
+def join(username):
+    online_users[username] = request.sid
+    emit('user_data', {
+        'online': list(online_users.keys()),
+        'friends': friends.get(username, []),
+        'requests': requests.get(username, []),
+        'is_admin': (username == ADMIN)
+    })
+    emit('online_update', list(online_users.keys()), broadcast=True)
+
+@socketio.on('public_msg')
+def pub(data):
+    u = data['from']
+    if u in banned:
+        return
+    if mute_users.get(u, False):
+        emit('msg_sys', '【系统】您已被禁言，无法发言')
+        return
+    emit('public_msg', data, broadcast=True)
+
+@socketio.on('private_msg')
+def priv(data):
+    f = data['from']
+    t = data['to']
+    if f in banned or mute_users.get(f, False):
+        return
+    if t not in friends.get(f, []):
+        return
+    if t in online_users:
+        emit('to_you_private', data, room=online_users[t])
+    emit('from_you_private', data)
+
+@socketio.on('add_friend')
+def add(data):
+    me = data['me']
+    tar = data['target']
+    if tar not in users:
+        return
+    if tar not in requests:
+        requests[tar] = []
+    if me not in requests[tar]:
+        requests[tar].append(me)
+    emit('friend_request', {'from': me}, room=online_users[tar])
+
+@socketio.on('accept_friend')
+def accept(data):
+    me = data['me']
+    you = data['you']
+    if you in requests.get(me, []):
+        requests[me].remove(you)
+        if you not in friends[me]:
+            friends[me].append(you)
+        if me not in friends[you]:
+            friends[you].append(me)
+        save_json(FRIEND_FILE, friends)
+    emit('user_data', {'friends': friends[me], 'requests': requests.get(me, [])})
+    if you in online_users:
+        emit('friend_accept', {'name': me}, room=online_users[you])
+
+@socketio.on('disconnect')
+def dc():
+    bye = None
+    for u, sid in online_users.items():
+        if sid == request.sid:
+            bye = u
+            break
+    if bye:
+        del online_users[bye]
+        emit('online_update', list(online_users.keys()), broadcast=True)
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

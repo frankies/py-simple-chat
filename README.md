@@ -1,16 +1,56 @@
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fvercel%2Ftree%2Fmain%2Fexamples%2Fflask&demo-title=Flask%20API&demo-description=Use%20Flask%20API%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fvercel-plus-flask.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994600/random/python.png)
+# py-simple-chat
 
-# Flask + Vercel
+一个基于 Flask 和 Flask-SocketIO 的简单聊天室项目。
 
-This example shows how to use Flask on Vercel with Serverless Functions using the [Python Runtime](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python).
+## 功能
+- 用户注册、登录
+- 公共聊天、私聊
+- 好友添加与请求
+- 管理员功能：禁言、踢人、封号
+- 在线用户显示
 
-## Demo
+## 依赖环境
+- Python 3.7+
+- Flask
+- Flask-SocketIO
+- uv（推荐用于依赖管理和安装）
 
-https://vercel-plus-flask.vercel.app/
 
-## How it Works
+## 环境准备
 
-This example uses the Web Server Gateway Interface (WSGI) with Flask to handle requests on Vercel with Serverless Functions.
+1. 安装 Python 3.7 及以上版本（可从 https://www.python.org/downloads/ 下载并安装）。
+2. 安装 uv（推荐，需先安装 Python）：
+
+    Windows 下可在命令行执行：
+    ```bash
+    pip install uv
+    ```
+    更多 uv 详情见：https://github.com/astral-sh/uv
+
+## 快速开始
+
+1. 安装依赖（推荐使用 uv）：
+
+```bash
+uv venv
+uv pip install -r requirements.txt
+```
+
+如在中国大陆，建议使用国内 PyPI 镜像源加速依赖安装。例如：
+
+- 清华大学镜像：
+    ```bash
+    uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+    ```
+- 阿里云镜像：
+    ```bash
+    uv pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+    ```
+
+也可直接用 pip：
+```bash
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
 
 ## Running Locally
 
@@ -18,14 +58,36 @@ This example uses the Web Server Gateway Interface (WSGI) with Flask to handle r
 npm i -g vercel
 python -m venv .venv
 source .venv/bin/activate
+pip instal uv
 uv sync  # or alternatively pip install flask gunicorn
-gunicorn main:app
+uv  run gunicorn main:app
 ```
 
-Your Flask application is now available at `http://localhost:3000`.
+2. 启动服务：
 
-## One-Click Deploy
+```bash
+uv run python app.py
+```
 
-Deploy the example using [Vercel](https://vercel.com?utm_source=github&utm_medium=readme&utm_campaign=vercel-examples):
+3. 访问页面：
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fvercel%2Ftree%2Fmain%2Fexamples%2Fflask&demo-title=Flask%20API&demo-description=Use%20Flask%20API%20on%20Vercel%20with%20Serverless%20Functions%20using%20the%20Python%20Runtime.&demo-url=https%3A%2F%2Fvercel-plus-flask.vercel.app%2F&demo-image=https://assets.vercel.com/image/upload/v1669994600/random/python.png)
+浏览器打开 http://localhost:5000
+
+## 目录结构
+
+```
+app.py
+requirements.txt
+.gitignore
+.gitattributes
+templates/
+    index.html
+```
+
+## 说明
+- 用户、好友、封禁等数据以 json 文件存储在项目根目录。
+- 管理员用户名为 `admin`，可在 app.py 中修改。
+
+---
+
+如需自定义或扩展功能，请参考 app.py 代码。

@@ -14,13 +14,22 @@ FRIEND_FILE = 'friends.json'
 IP_LIMIT_FILE = 'ip_limit.json'
 BAN_FILE = 'banned.json'
 
+# 通过环境变量控制是否使用内存存储（适配只读部署环境，如 Vercel）
+USE_MEMORY_STORAGE = os.getenv('USE_MEMORY_STORAGE', '1') == '1'
+_memory_store = {}
+
 def load_json(path, default):
+    if USE_MEMORY_STORAGE:
+        return _memory_store.get(path, default)
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return default
 
 def save_json(path, data):
+    if USE_MEMORY_STORAGE:
+        _memory_store[path] = data
+        return
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
 
@@ -62,7 +71,7 @@ def reg():
         ip_limit[ip] = {'date': today, 'count': 0}
     ip_data = ip_limit[ip]
     if ip_data['date'] == today:
-        if ip_data['count'] >= 100:
+        if ip_data['count'] >= 2:
             return jsonify({'ok':0, 'msg':'当前IP今日注册已达上限'})
         ip_data['count'] += 1
     else:

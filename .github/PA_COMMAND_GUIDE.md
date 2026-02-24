@@ -1,8 +1,27 @@
 # PythonAnywhere CLI (pa) 命令使用指南
 
-## 简介
+## 重要限制
 
-`pa` 是 PythonAnywhere 官方提供的命令行工具，用于管理 PythonAnywhere 服务。它基于 `pythonanywhere` Python 包。
+### pa webapp create 的限制
+
+`pa webapp create` 命令**只能在 PythonAnywhere 服务器上运行**，因为它需要：
+- `WORKON_HOME` 环境变量（只在 PythonAnywhere 上存在）
+- 本地文件系统访问
+
+**在 CI/CD 或本地机器上**，必须使用 PythonAnywhere API 创建 webapp。
+
+### 可以远程使用的命令
+
+以下命令可以在本地或 CI/CD 中使用：
+- ✅ `pa webapp list` - 列出应用
+- ✅ `pa webapp reload` - 重新加载应用
+- ✅ `pa webapp get` - 获取应用信息
+- ✅ `pa path get/delete/upload` - 文件操作
+- ✅ `pa schedule list/create/delete` - 定时任务
+
+以下命令只能在 PythonAnywhere 上使用：
+- ❌ `pa webapp create` - 创建应用（需要 WORKON_HOME）
+- ❌ `pa django autoconfigure` - Django 自动配置
 
 ## 安装
 
@@ -50,21 +69,24 @@ export PYTHONANYWHERE_SITE="www.pythonanywhere.com"
 ### 1. webapp - Web 应用管理
 
 ```bash
-# 列出所有 web 应用
+# 列出所有 web 应用（可远程使用）
 pa webapp list
 
-# 创建新的 web 应用
-pa webapp create --domain yourusername.pythonanywhere.com --python-version 3.12
-
-# 重新加载 web 应用
+# 重新加载 web 应用（可远程使用）
 pa webapp reload yourusername.pythonanywhere.com
 
-# 删除 web 应用
+# 获取 web 应用信息（可远程使用）
+pa webapp get yourusername.pythonanywhere.com
+
+# 删除 web 应用（可远程使用）
 pa webapp delete yourusername.pythonanywhere.com
 
-# 获取 web 应用信息
-pa webapp get yourusername.pythonanywhere.com
+# 创建新的 web 应用（仅限 PythonAnywhere 服务器）
+# 在 CI/CD 中必须使用 API
+pa webapp create --domain yourusername.pythonanywhere.com --python-version 3.12
 ```
+
+**注意**: `pa webapp create` 只能在 PythonAnywhere 控制台中运行！
 
 ### 2. path - 文件操作
 

@@ -95,6 +95,8 @@ def execute_in_console(commands):
             lines = cmd.strip().split('\n')
             for line in lines:
                 if line.strip():  # 跳过空行
+                    ## debug: 输出每行命令
+                    log("➡️", f"发送: {line.strip()}")
                     requests.post(
                         f'{base_url}/consoles/{console_id}/send_input/',
                         headers=headers,

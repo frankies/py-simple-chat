@@ -415,21 +415,22 @@ def main() -> None:
     # 1. 确保远程目录存在
     ensure_remote_directory(pa_project_path)
 
-    # 2. 在平台目录下执行一次 uv sync，确保依赖就绪
-    run_remote_uv_sync(pa_project_path)
-
-    # 3. 确保 Web 应用存在
-    ensure_webapp(pa_domain)
-
-    # 4. 更新 Web 应用配置：source_directory & virtualenv_path
-    update_webapp_config(pa_domain, pa_project_path)
-
-    # 5. 更新 WSGI 文件，使其指向新的 project_home
-    update_wsgi_file(pa_project_path)
-
-    # 6. 上传整个项目目录（不包含 .venv，只上传代码和资源）
+    # 2. 上传整个项目目录（不包含 .venv，只上传代码和资源）
     upload_tree(repo_root, pa_project_path)
 
+    # 3. 在平台目录下执行一次 uv sync，确保依赖就绪
+    run_remote_uv_sync(pa_project_path)
+    
+    # 4. 确保 Web 应用存在
+    ensure_webapp(pa_domain)
+
+    # 5. 更新 Web 应用配置：source_directory & virtualenv_path
+    update_webapp_config(pa_domain, pa_project_path)
+
+    # 6. 更新 WSGI 文件，使其指向新的 project_home
+    update_wsgi_file(pa_project_path)
+
+    
     # 7. 重载 Web 应用（尽力而为）
     maybe_reload_webapp(pa_domain)
 

@@ -251,6 +251,50 @@ def update_webapp_config(domain: str, project_path: str) -> None:
         log("⚠️", f"Web 应用配置更新失败: {resp.status_code} - {resp.text[:300]}")
 
 
+def update_wsgi_file(project_path: str) -> None:
+    """Update /var/www/<username>_pythonanywhere_com_wsgi.py to point to project_path."""
+    if not project_path:
+        return
+
+    env = os.environ.copy()
+    username = env.get("PA_USERNAME") or env.get("USER")
+    api_token = env.get("PA_API_TOKEN") or env.get("API_TOKEN")
+    host = env.get("PYTHONANYWHERE_SITE", "www.pythonanywhere.com")
+
+    if not username or not api_token:
+        log("⚠️", "缺少用户名或 API token，跳过更新 WSGI 文件")
+        return
+
+    wsgi_path = f"/var/www/{username}_pythonanywhere_com_wsgi.py"
+
+    wsgi_content = f"""import sys
+import os
+
+project_home = '{project_path}'
+if project_home not in sys.path:
+    sys.path.insert(0, project_home)
+
+os.environ['USE_MEMORY_STORAGE'] = '0'
+
+from main import app as application
+"""
+
+    url = f"https://{host}/api/v0/user/{username}/files/path{wsgi_path}"
+    headers = {"Authorization": f"Token {api_token}"}
+
+    log("📝", f"更新 WSGI 文件: {wsgi_path}")
+    try:
+        resp = requests.post(url, headers=headers, files={"content": ("wsgi.py", wsgi_content)}, timeout=30)
+    except Exception as exc:
+        log("⚠️", f"更新 WSGI 文件请求失败: {exc}")
+        return
+
+    if resp.status_code in (200, 201):
+        log("✅", "WSGI 文件更新成功")
+    else:
+        log("⚠️", f"WSGI 文件更新失败: {resp.status_code} - {resp.text[:300]}")
+
+
 def maybe_reload_webapp(domain: str) -> None:
     if not domain:
         return
@@ -286,10 +330,13 @@ def main() -> None:
     # 3. 更新 Web 应用配置：source_directory & virtualenv_path
     update_webapp_config(pa_domain, pa_project_path)
 
-    # 4. 上传整个项目目录（不包含 .venv，只上传代码和资源）
+    # 4. 更新 WSGI 文件，使其指向新的 project_home
+    update_wsgi_file(pa_project_path)
+
+    # 5. 上传整个项目目录（不包含 .venv，只上传代码和资源）
     upload_tree(repo_root, pa_project_path)
 
-    # 5. 重载 Web 应用（尽力而为）
+    # 6. 重载 Web 应用（尽力而为）
     maybe_reload_webapp(pa_domain)
 
     log("✅", "项目上传完成")

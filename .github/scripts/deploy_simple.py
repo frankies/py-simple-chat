@@ -85,38 +85,79 @@ def execute_in_console(commands):
     headers = {'Authorization': f'Token {api_token}'}
     
     try:
-        # 执行命令
-        for cmd in commands:
-            log("📤", f"执行: {cmd}")
-            requests.post(
-                f'{base_url}/consoles/{console_id}/send_input/',
+        # 发送命令
+        for i, cmd in enumerate(commands, 1):
+            log("📤", f"发送命令 {i}/{len(commands)}")
+            
+            # 将多行命令分行发送
+            lines = cmd.strip().split('\n')
+            for line in lines:
+                if line.strip():  # 跳过空行
+                    requests.post(
+                        f'{base_url}/consoles/{console_id}/send_input/',
+                        headers=headers,
+                        data={'input': line + '\n'},
+                        timeout=30
+                    )
+                    time.sleep(0.5)  # 短暂延迟
+        
+        # 等待命令执行
+        log("⏳", "等待命令执行完成（最多30秒）...")
+        
+        # 轮询获取输出
+        max_attempts = 10
+        output_text = ""
+        
+        for attempt in range(max_attempts):
+            time.sleep(3)
+            
+            resp = requests.get(
+                f'{base_url}/consoles/{console_id}/get_latest_output/',
                 headers=headers,
-                data={'input': cmd + '\n'},
                 timeout=30
             )
-            time.sleep(2)
+            
+            if resp and resp.status_code == 200:
+                new_output = resp.json().get('output', '')
+                
+                # 如果有新输出
+                if new_output and new_output != output_text:
+                    output_text = new_output
+                    
+                    # 检查是否完成
+                    if '=== 设置完成 ===' in output_text:
+                        log("✅", "检测到完成标记")
+                        break
+                    
+                    log("�", f"获取输出中... ({attempt + 1}/{max_attempts})")
         
-        # 等待执行完成
-        time.sleep(3)
-        
-        # 获取输出
-        resp = requests.get(
-            f'{base_url}/consoles/{console_id}/get_latest_output/',
-            headers=headers,
-            timeout=30
-        )
-        if resp and resp.status_code == 200:
-            output = resp.json().get('output', '')
-            if output:
-                print("--- 控制台输出 ---")
-                print(output)
-                print("--- 输出结束 ---")
+        # 显示输出
+        if output_text:
+            print("\n" + "="*70)
+            print("PythonAnywhere 控制台输出:")
+            print("="*70)
+            print(output_text)
+            print("="*70 + "\n")
+            
+            # 检查是否有错误
+            if 'error' in output_text.lower() or 'failed' in output_text.lower():
+                log("⚠️", "输出中可能包含错误，请检查")
+        else:
+            log("⚠️", "未获取到控制台输出")
+            log("💡", "命令可能仍在执行，或执行时间过长")
         
         return True
+        
+    except Exception as e:
+        log("❌", f"执行命令时出错: {e}")
+        return False
     finally:
         # 删除控制台
-        requests.delete(f'{base_url}/consoles/{console_id}/', headers=headers, timeout=30)
-        log("🗑️", "控制台已清理")
+        try:
+            requests.delete(f'{base_url}/consoles/{console_id}/', headers=headers, timeout=30)
+            log("🗑️", "控制台已清理")
+        except:
+            pass
 
 def create_webapp_via_api(domain, python_version):
     """使用 API 创建 Web 应用"""
@@ -260,20 +301,41 @@ def main():
     
     # 1. 设置项目代码
     log("📦", "设置项目...")
-    commands = [
-        f"cd ~",
-        f"if [ -d {project_name} ]; then echo 'Updating...'; cd {project_name} && git pull origin main; else echo 'Cloning...'; git clone {repo_url} {project_name}; fi",
-        f"cd {project_name}",
-        f"pip install --user uv || echo 'uv already installed'",
-        f"uv sync",
-        f"touch users.json friends.json ip_limit.json banned.json || true",
-        f"[ ! -s users.json ] && echo '{{}}' > users.json || true",
-        f"[ ! -s friends.json ] && echo '{{}}' > friends.json || true",
-        f"[ ! -s ip_limit.json ] && echo '{{}}' > ip_limit.json || true",
-        f"[ ! -s banned.json ] && echo '{{}}' > banned.json || true",
-        f"chmod 644 *.json || true",
-        f"echo 'Setup complete'",
-    ]
+    
+    # 将所有命令合并为一个脚本
+    script = f"""
+cd ~
+if [ -d {project_name} ]; then
+    echo "=== 更新现有项目 ==="
+    cd {project_name}
+    git pull origin main
+else
+    echo "=== 克隆新项目 ==="
+    git clone {repo_url} {project_name}
+    cd {project_name}
+fi
+
+echo "=== 安装 uv ==="
+pip install --user uv || echo "uv 已安装"
+
+echo "=== 同步依赖 ==="
+uv sync
+
+echo "=== 初始化数据文件 ==="
+touch users.json friends.json ip_limit.json banned.json
+[ ! -s users.json ] && echo '{{}}' > users.json || echo "users.json 已存在"
+[ ! -s friends.json ] && echo '{{}}' > friends.json || echo "friends.json 已存在"
+[ ! -s ip_limit.json ] && echo '{{}}' > ip_limit.json || echo "ip_limit.json 已存在"
+[ ! -s banned.json ] && echo '{{}}' > banned.json || echo "banned.json 已存在"
+chmod 644 *.json
+
+echo "=== 设置完成 ==="
+echo "项目路径: $(pwd)"
+echo "Python 版本: $(python --version)"
+echo "uv 版本: $(uv --version)"
+"""
+    
+    commands = [script]
     
     if not execute_in_console(commands):
         log("⚠️", "项目设置可能未完全成功，继续...")

@@ -295,6 +295,97 @@ from main import app as application
         log("⚠️", f"WSGI 文件更新失败: {resp.status_code} - {resp.text[:300]}")
 
 
+def run_remote_uv_sync(project_path: str) -> None:
+    """Run `uv sync` on PythonAnywhere inside the project directory via Consoles API."""
+    if not project_path:
+        return
+
+    env = os.environ.copy()
+    username = env.get("PA_USERNAME") or env.get("USER")
+    api_token = env.get("PA_API_TOKEN") or env.get("API_TOKEN")
+    host = env.get("PYTHONANYWHERE_SITE", "www.pythonanywhere.com")
+
+    if not username or not api_token:
+        log("⚠️", "缺少用户名或 API token，跳过远程 uv sync")
+        return
+
+    base_url = f"https://{host}/api/v0/user/{username}"
+    headers = {"Authorization": f"Token {api_token}"}
+
+    log("🖥️", "创建远程 Bash 控制台以执行 uv sync...")
+    try:
+        resp = requests.post(
+            f"{base_url}/consoles/",
+            headers=headers,
+            data={
+                "executable": "/bin/bash",
+                "arguments": "-l",
+                "working_directory": project_path,
+            },
+            timeout=30,
+        )
+    except Exception as exc:
+        log("⚠️", f"创建远程控制台失败: {exc}")
+        return
+
+    if resp.status_code not in (200, 201):
+        log("⚠️", f"创建远程控制台失败: {resp.status_code} - {resp.text[:200]}")
+        return
+
+    try:
+        console_id = resp.json().get("id")
+    except Exception:
+        console_id = None
+
+    if not console_id:
+        log("⚠️", "创建控制台响应中缺少 id，跳过 uv sync")
+        return
+
+    log("✅", f"控制台已创建，ID: {console_id}")
+
+    # 在远程环境中安装 uv（如有需要）并执行 uv sync
+    script = "pip install --user uv || echo 'uv maybe already installed'\nuv sync\n"
+
+    try:
+        requests.post(
+            f"{base_url}/consoles/{console_id}/send_input/",
+            headers=headers,
+            data={"input": script},
+            timeout=30,
+        )
+        log("📤", "已发送 uv sync 命令到远程控制台")
+
+        # 简单轮询几次输出，方便在日志里看到执行情况
+        for _ in range(6):  # 约 30 秒
+            try:
+                out_resp = requests.get(
+                    f"{base_url}/consoles/{console_id}/get_latest_output/",
+                    headers=headers,
+                    timeout=30,
+                )
+            except Exception:
+                break
+
+            if out_resp.status_code != 200:
+                break
+
+            output = out_resp.json().get("output", "")
+            if output:
+                print(output)
+            import time as _time
+            _time.sleep(5)
+    finally:
+        # 结束并清理控制台（尽力而为）
+        try:
+            requests.delete(
+                f"{base_url}/consoles/{console_id}/",
+                headers=headers,
+                timeout=30,
+            )
+        except Exception:
+            pass
+
+
 def maybe_reload_webapp(domain: str) -> None:
     if not domain:
         return
@@ -336,7 +427,10 @@ def main() -> None:
     # 5. 上传整个项目目录（不包含 .venv，只上传代码和资源）
     upload_tree(repo_root, pa_project_path)
 
-    # 6. 重载 Web 应用（尽力而为）
+    # 6. 在平台目录下执行一次 uv sync，确保依赖就绪
+    run_remote_uv_sync(pa_project_path)
+
+    # 7. 重载 Web 应用（尽力而为）
     maybe_reload_webapp(pa_domain)
 
     log("✅", "项目上传完成")

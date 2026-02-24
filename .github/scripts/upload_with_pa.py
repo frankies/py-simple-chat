@@ -44,8 +44,9 @@ def run_pa_command(args, check: bool = True) -> subprocess.CompletedProcess:
         log("❌", "缺少 PA_USERNAME/USER（PythonAnywhere 用户名）")
         sys.exit(1)
 
-    # 强制覆盖 USER，避免继续使用 GitHub runner 的默认用户名
+    # 强制覆盖 USER，并设置 PYTHONANYWHERE_USERNAME，避免继续使用 GitHub runner 的默认用户名
     env["USER"] = pa_username
+    env["PYTHONANYWHERE_USERNAME"] = pa_username
 
     api_token = env.get("PA_API_TOKEN") or env.get("API_TOKEN")
     if not api_token:

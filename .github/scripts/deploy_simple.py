@@ -207,20 +207,34 @@ def reload_webapp(domain):
     """重新加载 Web 应用"""
     log("🔄", "重新加载应用...")
     
-    # 先尝试使用 pa 命令
-    if run_pa_command(f'pa webapp reload -d {domain}'):
-        log("✅", "应用重新加载成功")
-        return True
+    # 直接使用 API
+    api_token = os.environ.get('PA_API_TOKEN')
+    username = os.environ.get('PA_USERNAME')
+    url = f'https://www.pythonanywhere.com/api/v0/user/{username}/webapps/{domain}/reload/'
+    headers = {'Authorization': f'Token {api_token}'}
     
-    # 如果 pa 命令失败，使用 API
-    log("🔄", "尝试通过 API 重新加载...")
-    resp = api_post(f'/webapps/{domain}/reload/')
-    
-    if resp and resp.status_code == 200:
-        log("✅", "应用重新加载成功")
-        return True
-    else:
-        log("⚠️", "重新加载失败")
+    try:
+        resp = requests.post(url, headers=headers, timeout=30)
+        
+        if resp.status_code == 200:
+            log("✅", "应用重新加载成功")
+            return True
+        elif resp.status_code == 403:
+            log("⚠️", "权限不足或应用不存在")
+            log("💡", "可能的原因：")
+            log("💡", "  1. Web 应用尚未创建")
+            log("💡", "  2. API Token 权限不足")
+            log("💡", "  3. 域名不正确")
+            return False
+        elif resp.status_code == 404:
+            log("⚠️", "Web 应用不存在")
+            log("💡", f"请先在 PythonAnywhere 创建应用: {domain}")
+            return False
+        else:
+            log("⚠️", f"重新加载失败: {resp.status_code} - {resp.text}")
+            return False
+    except Exception as e:
+        log("❌", f"重新加载错误: {e}")
         return False
 
 def main():

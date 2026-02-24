@@ -96,6 +96,9 @@ def api_request(method: str, endpoint: str, data=None):
         elif method == "POST":
             # 使用 form-data 以兼容 webapps 创建接口
             resp = requests.post(url, headers=headers, data=data, timeout=30)
+        elif method == "PATCH":
+            # 对配置更新，官方示例使用 JSON
+            resp = requests.patch(url, headers=headers, json=data, timeout=30)
         else:
             raise ValueError(f"不支持的 HTTP 方法: {method}")
         return resp
@@ -221,12 +224,39 @@ def ensure_webapp(domain: str) -> None:
         log("❌", f"Web 应用创建失败: {create_resp.status_code} - {create_resp.text[:300]}")
 
 
+def update_webapp_config(domain: str, project_path: str) -> None:
+    """Update webapp config: source_directory & virtualenv_path.
+
+    - source_directory: 指向代码所在目录（PA_PROJECT_PATH）
+    - virtualenv_path: 指向虚拟环境目录，约定为 <PA_PROJECT_PATH>/.venv
+    """
+    if not domain or not project_path:
+        return
+
+    log("⚙️", f"更新 Web 应用配置: {domain}")
+
+    data = {
+        "source_directory": project_path,
+        "virtualenv_path": f"{project_path}/.venv",
+    }
+
+    resp = api_request("PATCH", f"/webapps/{domain}/", data=data)
+    if not resp:
+        log("⚠️", "更新 Web 应用配置失败（API 无响应）")
+        return
+
+    if resp.status_code == 200:
+        log("✅", "Web 应用配置更新成功")
+    else:
+        log("⚠️", f"Web 应用配置更新失败: {resp.status_code} - {resp.text[:300]}")
+
+
 def maybe_reload_webapp(domain: str) -> None:
     if not domain:
         return
     log("🔄", f"重新加载 Web 应用: {domain}")
     # best-effort reload; 不失败整个部署
-    result = run_pa_command(["webapp", "reload", domain], check=False)
+    result = run_pa_command(["webapp", "reload", "-d", domain], check=False)
     if result.returncode == 0:
         log("✅", "Web 应用重新加载成功")
     else:
@@ -253,10 +283,13 @@ def main() -> None:
     # 2. 确保 Web 应用存在
     ensure_webapp(pa_domain)
 
-    # 3. 上传整个项目目录（包含 .venv）
+    # 3. 更新 Web 应用配置：source_directory & virtualenv_path
+    update_webapp_config(pa_domain, pa_project_path)
+
+    # 4. 上传整个项目目录（不包含 .venv，只上传代码和资源）
     upload_tree(repo_root, pa_project_path)
 
-    # 4. 重载 Web 应用（尽力而为）
+    # 5. 重载 Web 应用（尽力而为）
     maybe_reload_webapp(pa_domain)
 
     log("✅", "项目上传完成")

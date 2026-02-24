@@ -25,7 +25,7 @@ jobs:
 
       - name: Install PythonAnywhere CLI
         run: |
-          uv pip install pythonanywhere
+          uv pip install --system pythonanywhere
 
       - name: Configure PA CLI
         env:

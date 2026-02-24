@@ -118,21 +118,16 @@ def execute_in_console(commands):
     try:
         # 发送命令
         for i, cmd in enumerate(commands, 1):
-            log("📤", f"发送命令 {i}/{len(commands)}")
-            
-            # 将多行命令分行发送
-            lines = cmd.strip().split('\n')
-            for line in lines:
-                if line.strip():  # 跳过空行
-                    ## debug: 输出每行命令
-                    log("➡️", f"发送: {line.strip()}")
-                    requests.post(
-                        f'{base_url}/consoles/{console_id}/send_input/',
-                        headers=headers,
-                        data={'input': line + '\n'},
-                        timeout=30
-                    )
-                    time.sleep(0.5)  # 短暂延迟
+            # 将整段多行脚本一次性发送，让 bash 自行按行解析
+            script = cmd.strip() + "\n"
+            log("📤", f"发送整段脚本 {i}/{len(commands)}，长度 {len(script)}")
+
+            requests.post(
+                f'{base_url}/consoles/{console_id}/send_input/',
+                headers=headers,
+                data={'input': script},
+                timeout=30
+            )
 
         # 发送 exit，提示控制台在脚本执行完后退出
         requests.post(

@@ -345,13 +345,14 @@ def run_remote_uv_sync(project_path: str) -> None:
     script = "pip install --user uv || echo 'uv maybe already installed'\nuv sync\n"
 
     try:
-        requests.post(
+        resp_send = requests.post(
             f"{base_url}/consoles/{console_id}/send_input/",
             headers=headers,
             data={"input": script},
             timeout=30,
         )
         log("📤", "已发送 uv sync 命令到远程控制台")
+        log("📊", f"send_input 响应: {resp_send.status_code} - {getattr(resp_send, 'text', '')[:300]}")
 
         # 简单轮询几次输出，方便在日志里看到执行情况
         for _ in range(6):  # 约 30 秒

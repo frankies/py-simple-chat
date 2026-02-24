@@ -32,10 +32,24 @@ def log(prefix: str, message: str) -> None:
 
 
 def run_pa_command(args, check: bool = True) -> subprocess.CompletedProcess:
-    """Run a `pa` CLI command with API_TOKEN/USER env wired."""
+    """Run a `pa` CLI command with correct PA username and token.
+
+    优先使用 PA_USERNAME + PA_API_TOKEN，其次回退到 USER + API_TOKEN。
+    """
     env = os.environ.copy()
-    if "API_TOKEN" not in env or "USER" not in env:
-        log("❌", "环境变量 API_TOKEN 或 USER 未设置（PythonAnywhere 认证失败）")
+
+    # 统一用户名：优先 PA_USERNAME，其次 USER
+    pa_username = env.get("PA_USERNAME") or env.get("USER")
+    if not pa_username:
+        log("❌", "缺少 PA_USERNAME/USER（PythonAnywhere 用户名）")
+        sys.exit(1)
+
+    # 强制覆盖 USER，避免继续使用 GitHub runner 的默认用户名
+    env["USER"] = pa_username
+
+    api_token = env.get("PA_API_TOKEN") or env.get("API_TOKEN")
+    if not api_token:
+        log("❌", "缺少 PA_API_TOKEN/API_TOKEN（PythonAnywhere API token）")
         sys.exit(1)
 
     cmd = ["pa"] + list(args)
@@ -61,8 +75,10 @@ def api_request(method: str, endpoint: str, data=None):
 
     Prefers PA_API_TOKEN/PA_USERNAME, falls back to API_TOKEN/USER.
     """
-    api_token = os.environ.get("PA_API_TOKEN") or os.environ.get("API_TOKEN")
-    username = os.environ.get("PA_USERNAME") or os.environ.get("USER")
+    env = os.environ.copy()
+    api_token = env.get("PA_API_TOKEN") or env.get("API_TOKEN")
+    # 与 run_pa_command 保持一致：优先 PA_USERNAME
+    username = env.get("PA_USERNAME") or env.get("USER")
     host = os.environ.get("PYTHONANYWHERE_SITE", "www.pythonanywhere.com")
 
     if not api_token or not username:

@@ -31,6 +31,7 @@ jobs:
         env:
           API_TOKEN: ${{ secrets.PA_API_TOKEN }}
           USER: ${{ vars.PA_USERNAME }}
+          PA_USERNAME: ${{ vars.PA_USERNAME }}
           PA_DOMAIN: ${{ vars.PA_DOMAIN }}
           PA_PROJECT_PATH: ${{ vars.PA_PROJECT_PATH }}
         run: |

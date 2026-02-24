@@ -19,9 +19,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install PythonAnywhere CLI
+      - name: Install dependencies
         run: |
-          pip install pythonanywhere
+          pip install pythonanywhere requests
 
       - name: Deploy to PythonAnywhere
         env:

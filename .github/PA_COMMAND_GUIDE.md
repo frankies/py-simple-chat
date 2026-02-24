@@ -56,11 +56,6 @@ pa webapp list
 # 创建新的 web 应用
 pa webapp create --domain yourusername.pythonanywhere.com --python 3.12
 
-# 创建带源代码目录的 web 应用
-pa webapp create --domain yourusername.pythonanywhere.com \
-  --python 3.12 \
-  --source-directory /home/yourusername/myproject
-
 # 重新加载 web 应用
 pa webapp reload yourusername.pythonanywhere.com
 
@@ -71,32 +66,14 @@ pa webapp delete yourusername.pythonanywhere.com
 pa webapp get yourusername.pythonanywhere.com
 ```
 
-### 2. exec - 执行远程命令
-
-在 PythonAnywhere 服务器上执行 bash 命令：
-
-```bash
-# 执行单个命令
-pa exec "ls -la"
-
-# 切换目录并执行命令
-pa exec "cd ~/myproject && git pull"
-
-# 安装 Python 包
-pa exec "pip install --user flask"
-
-# 运行 Python 脚本
-pa exec "python ~/myproject/script.py"
-
-# 检查文件是否存在
-pa exec "test -f ~/myproject/main.py && echo EXISTS || echo NOT_EXISTS"
-```
-
-### 3. path - 文件操作
+### 2. path - 文件操作
 
 ```bash
 # 获取文件内容
 pa path get /home/yourusername/file.txt
+
+# 列出目录内容
+pa path get /home/yourusername/myproject
 
 # 删除文件
 pa path delete /home/yourusername/old_file.txt
@@ -104,14 +81,23 @@ pa path delete /home/yourusername/old_file.txt
 # 删除目录
 pa path delete /home/yourusername/old_directory
 
+# 上传文件内容
+pa path upload /home/yourusername/file.txt --contents local_file.txt
+
 # 创建共享链接
 pa path share /home/yourusername/file.txt
 
 # 检查共享链接状态
 pa path share /home/yourusername/file.txt --check
+
+# 取消共享
+pa path unshare /home/yourusername/file.txt
+
+# 显示目录树
+pa path tree /home/yourusername/myproject
 ```
 
-### 4. schedule - 定时任务管理
+### 3. schedule - 定时任务管理
 
 ```bash
 # 列出所有定时任务
@@ -128,7 +114,7 @@ pa schedule delete TASK_ID
 pa schedule get TASK_ID
 ```
 
-### 5. django - Django 项目部署
+### 4. django - Django 项目部署
 
 ```bash
 # 自动配置 Django 项目
@@ -155,102 +141,94 @@ pa django autoconfigure --domain yourusername.pythonanywhere.com \
     pa webapp reload ${{ secrets.PA_DOMAIN }}
 ```
 
-### 完整示例
+### 使用 PythonAnywhere API
 
-```yaml
-- name: Install PA CLI
-  run: pip install pythonanywhere
+由于 `pa` 命令不支持执行远程 bash 命令，在 CI/CD 中需要使用 PythonAnywhere API：
 
-- name: Update Code and Reload
-  env:
-    API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-    USER: ${{ secrets.PA_USERNAME }}
-  run: |
-    # 更新代码
-    pa exec "cd ~/myproject && git pull"
-    
-    # 安装依赖
-    pa exec "cd ~/myproject && pip install --user -r requirements.txt"
-    
-    # 重新加载应用
-    pa webapp reload yourusername.pythonanywhere.com
+```python
+import requests
+
+# 创建控制台
+response = requests.post(
+    f'https://www.pythonanywhere.com/api/v0/user/{username}/consoles/',
+    headers={'Authorization': f'Token {api_token}'}
+)
+console_id = response.json()['id']
+
+# 发送命令
+requests.post(
+    f'https://www.pythonanywhere.com/api/v0/user/{username}/consoles/{console_id}/send_input/',
+    headers={'Authorization': f'Token {api_token}'},
+    json={'input': 'cd ~/project && git pull\n'}
+)
 ```
 
 ## 常见使用场景
 
-### 场景 1: 首次部署
+### 场景 1: 首次部署（使用 API）
+
+由于 `pa` 命令不支持远程命令执行，需要使用 PythonAnywhere API：
+
+```python
+import requests
+
+api_token = "your_token"
+username = "your_username"
+base_url = f"https://www.pythonanywhere.com/api/v0/user/{username}"
+headers = {"Authorization": f"Token {api_token}"}
+
+# 1. 创建控制台
+console_response = requests.post(f"{base_url}/consoles/", headers=headers)
+console_id = console_response.json()['id']
+
+# 2. 执行命令
+commands = [
+    "cd ~ && git clone https://github.com/user/repo.git myproject",
+    "cd ~/myproject && pip install --user -r requirements.txt"
+]
+
+for cmd in commands:
+    requests.post(
+        f"{base_url}/consoles/{console_id}/send_input/",
+        headers=headers,
+        json={"input": cmd + "\n"}
+    )
+    time.sleep(2)
+
+# 3. 删除控制台
+requests.delete(f"{base_url}/consoles/{console_id}/", headers=headers)
+```
+
+### 场景 2: 使用 pa 命令管理 webapp
 
 ```bash
-# 1. 克隆仓库
-pa exec "cd ~ && git clone https://github.com/username/repo.git myproject"
+# 创建 web 应用
+pa webapp create --domain yourusername.pythonanywhere.com --python 3.12
 
-# 2. 安装依赖
-pa exec "cd ~/myproject && pip install --user -r requirements.txt"
-
-# 3. 创建 web 应用
-pa webapp create --domain yourusername.pythonanywhere.com \
-  --python 3.12 \
-  --source-directory /home/yourusername/myproject
-
-# 4. 配置完成后重新加载
+# 重新加载应用
 pa webapp reload yourusername.pythonanywhere.com
 ```
 
-### 场景 2: 更新部署
+### 场景 3: 文件操作
 
 ```bash
-# 1. 拉取最新代码
-pa exec "cd ~/myproject && git pull origin main"
+# 上传配置文件
+pa path upload /home/yourusername/myproject/config.py --contents local_config.py
 
-# 2. 更新依赖
-pa exec "cd ~/myproject && pip install --user -r requirements.txt"
+# 查看日志
+pa path get /var/log/yourusername.pythonanywhere.com.error.log
 
-# 3. 运行迁移（如果需要）
-pa exec "cd ~/myproject && python manage.py migrate"
-
-# 4. 重新加载应用
-pa webapp reload yourusername.pythonanywhere.com
-```
-
-### 场景 3: 使用 uv 管理依赖
-
-```bash
-# 1. 安装 uv
-pa exec "pip install --user uv"
-
-# 2. 同步依赖
-pa exec "cd ~/myproject && uv sync"
-
-# 3. 重新加载
-pa webapp reload yourusername.pythonanywhere.com
-```
-
-### 场景 4: 检查和调试
-
-```bash
-# 检查项目目录
-pa exec "ls -la ~/myproject"
-
-# 查看 Python 版本
-pa exec "python --version"
-
-# 检查已安装的包
-pa exec "pip list --user"
-
-# 查看环境变量
-pa exec "env | grep PYTHON"
-
-# 测试 Python 脚本
-pa exec "cd ~/myproject && python -c 'import main; print(main.app)'"
+# 删除旧文件
+pa path delete /home/yourusername/old_backup
 ```
 
 ## 错误处理
 
 ### 常见错误
 
-1. **No such option: --set-token**
-   - 原因：旧版本命令，新版本不支持
-   - 解决：使用环境变量 `API_TOKEN` 代替
+1. **No such command 'exec'**
+   - 原因：`pa` 命令不支持 `exec` 子命令
+   - 解决：使用 PythonAnywhere API 的 consoles 端点执行远程命令
 
 2. **Authentication failed**
    - 原因：API Token 无效或未设置

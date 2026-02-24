@@ -37,6 +37,10 @@ def api_call(method, endpoint, data=None):
     url = f'https://www.pythonanywhere.com/api/v0/user/{username}{endpoint}'
     headers = {'Authorization': f'Token {api_token}'}
     
+    log("🔗", f"API 请求: {method} {url}")
+    if data:
+        log("📋", f"请求数据: {data}")
+    
     try:
         if method == 'GET':
             resp = requests.get(url, headers=headers, timeout=30)
@@ -45,9 +49,22 @@ def api_call(method, endpoint, data=None):
         elif method == 'PATCH':
             resp = requests.patch(url, headers=headers, json=data, timeout=30)
         
+        log("📊", f"响应状态: {resp.status_code}")
+        if resp.status_code >= 400:
+            log("⚠️", f"响应内容: {resp.text}")
+        
         return resp
+    except requests.exceptions.Timeout as e:
+        log("❌", f"请求超时: {e}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        log("❌", f"连接错误: {e}")
+        return None
+    except requests.exceptions.RequestException as e:
+        log("❌", f"请求异常: {e}")
+        return None
     except Exception as e:
-        log("❌", f"API 错误: {e}")
+        log("❌", f"未知错误: {type(e).__name__}: {e}")
         return None
 
 def execute_in_console(commands):
@@ -254,15 +271,22 @@ def main():
         log("🆕", "创建 Web 应用...")
         
         if not create_webapp_via_api(domain, python_version):
-            log("❌", "Web 应用创建失败")
-            log("💡", "请手动在 PythonAnywhere Web 页面创建应用")
-            log("💡", f"域名: {domain}")
-            log("💡", f"Python 版本: {python_version}")
-            sys.exit(1)
-        
-        time.sleep(2)
+            log("⚠️", "Web 应用创建失败")
+            log("💡", "可能的原因：")
+            log("💡", "  1. API Token 权限不足")
+            log("💡", "  2. 域名已被使用")
+            log("💡", "  3. 免费账户限制（最多1个应用）")
+            log("💡", "")
+            log("💡", "解决方案：")
+            log("💡", f"  请手动在 PythonAnywhere Web 页面创建应用")
+            log("💡", f"  域名: {domain}")
+            log("💡", f"  Python 版本: {python_version}")
+            log("💡", "")
+            log("🔄", "继续尝试配置现有应用...")
+        else:
+            time.sleep(2)
     
-    # 4. 更新配置
+    # 4. 更新配置（无论是否刚创建）
     update_webapp_config(domain, project_path)
     
     # 5. 更新 WSGI 文件
@@ -270,9 +294,10 @@ def main():
     
     # 6. 重新加载应用
     if not reload_webapp(domain):
-        log("⚠️", "应用重新加载失败，请手动重新加载")
+        log("⚠️", "应用重新加载失败")
+        log("💡", "如果应用不存在，请先手动创建")
     
-    log("✅", "部署完成！")
+    log("✅", "部署流程完成！")
     log("🌐", f"访问: https://{domain}")
 
 if __name__ == '__main__':

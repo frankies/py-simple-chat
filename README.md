@@ -77,6 +77,33 @@ python main.py
 
 浏览器打开 http://localhost:5000
 
+## 部署到 PythonAnywhere
+
+本项目支持通过 GitHub Actions 自动部署到 PythonAnywhere。
+
+### 快速开始
+
+1. **配置 GitHub Secrets 和 Variables**
+   - Secret（加密）: `PA_API_TOKEN` - PythonAnywhere API Token
+   - Variables（普通）:
+     - `PA_USERNAME` - PythonAnywhere 用户名
+     - `PA_DOMAIN` - 域名（如：username.pythonanywhere.com）
+     - `PA_PROJECT_PATH` - 项目路径（如：/home/username/py-simple-chat）
+
+2. **首次部署**
+   - 推荐：先手动创建 Web 应用（见 [手动设置指南](.github/MANUAL_SETUP.md)）
+   - 或：推送代码尝试自动创建（可能失败于免费账户）
+
+3. **后续更新**
+   - 推送代码到 main 分支自动部署
+   - 自动更新代码和依赖
+   - 自动重新加载应用
+
+详细说明：
+- [快速部署指南](.github/DEPLOY_GUIDE.md)
+- [手动设置指南](.github/MANUAL_SETUP.md)
+- [完整部署文档](DEPLOYMENT.md)
+
 ## 目录结构
 
 ```

@@ -31,22 +31,42 @@
 3. 点击 "Create a new API token"
 4. 复制 token（只显示一次）
 
-### 2. 配置 GitHub Secrets
+### 2. 配置 GitHub Secrets 和 Variables
 
-在 GitHub 仓库设置中添加以下 Secrets：
+在 GitHub 仓库中配置以下内容：
 
-Settings → Secrets and variables → Actions → New repository secret
+**Secrets（加密变量）** - Settings → Secrets and variables → Actions → Secrets
 
 | 名称 | 值 | 示例 |
 |------|-----|------|
-| PA_API_TOKEN | 你的 API Token | `1234abcd...` |
+| PA_API_TOKEN | PythonAnywhere API Token | `abc123...` |
+
+**Variables（普通变量）** - Settings → Secrets and variables → Actions → Variables
+
+| 名称 | 值 | 示例 |
+|------|-----|------|
 | PA_USERNAME | PythonAnywhere 用户名 | `myusername` |
 | PA_DOMAIN | Web 应用域名 | `myusername.pythonanywhere.com` |
 | PA_PROJECT_PATH | 项目路径 | `/home/myusername/py-simple-chat` |
 
+**详细配置步骤：** 查看 [GitHub 配置指南](GITHUB_CONFIG.md)
+
+**配置步骤：**
+
+1. 进入 GitHub 仓库
+2. 点击 Settings → Secrets and variables → Actions
+3. 点击 **Secrets** 标签
+   - 点击 "New repository secret"
+   - 添加 `PA_API_TOKEN`
+4. 点击 **Variables** 标签
+   - 点击 "New repository variable"
+   - 依次添加 `PA_USERNAME`、`PA_DOMAIN`、`PA_PROJECT_PATH`
+
 注意：PA_PROJECT_PATH 使用你的用户名，项目名称保持 `py-simple-chat`
 
-## 二、首次部署（自动完成）
+## 二、首次部署
+
+### 选项 A: 自动部署（推荐尝试）
 
 推送代码触发自动部署：
 
@@ -56,21 +76,46 @@ git commit -m "Setup CI/CD"
 git push origin main
 ```
 
-GitHub Actions 会自动完成以下操作：
-- ✅ 克隆仓库到 PythonAnywhere
-- ✅ 创建 Web 应用
-- ✅ 配置 WSGI 文件
-- ✅ 初始化数据文件
-- ✅ 安装依赖
-- ✅ 启动应用
+GitHub Actions 会尝试自动完成所有操作。
 
 查看部署状态：GitHub → Actions 标签
+
+### 选项 B: 手动设置（如果自动失败）
+
+如果自动部署失败（常见于免费账户），请按照 [手动设置指南](.github/MANUAL_SETUP.md) 操作。
+
+**为什么可能失败？**
+- 免费账户只能创建 1 个 Web 应用
+- API 创建应用可能需要付费账户
+- 首次部署建议手动创建
+
+**手动设置后的好处：**
+- 后续推送代码会自动更新
+- 自动同步依赖
+- 自动重新加载应用
 
 ## 三、验证部署
 
 访问你的应用：https://yourusername.pythonanywhere.com
 
 ## 常见问题
+
+### Q: 自动部署失败，显示 "Web 应用创建失败"？
+
+A: 这是正常的，特别是免费账户。解决方案：
+
+1. **手动创建应用**（推荐）
+   - 按照 [手动设置指南](.github/MANUAL_SETUP.md) 操作
+   - 只需设置一次
+   - 后续推送会自动更新
+
+2. **检查账户限制**
+   - 免费账户只能创建 1 个 Web 应用
+   - 如果已有应用，需要先删除
+
+3. **验证 API Token**
+   - 确保 Token 有效
+   - 重新生成 Token 并更新 GitHub Secrets
 
 ### Q: pa 命令如何工作？
 

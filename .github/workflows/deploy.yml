@@ -27,12 +27,12 @@ jobs:
         env:
           API_TOKEN: ${{ secrets.PA_API_TOKEN }}
           PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-          PA_USERNAME: ${{ secrets.PA_USERNAME }}
-          PA_DOMAIN: ${{ secrets.PA_DOMAIN }}
-          PA_PROJECT_PATH: ${{ secrets.PA_PROJECT_PATH }}
+          PA_USERNAME: ${{ vars.PA_USERNAME }}
+          PA_DOMAIN: ${{ vars.PA_DOMAIN }}
+          PA_PROJECT_PATH: ${{ vars.PA_PROJECT_PATH }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PYTHON_VERSION: '3.12'
-          USER: ${{ secrets.PA_USERNAME }}
+          USER: ${{ vars.PA_USERNAME }}
         run: |
           chmod +x .github/scripts/deploy_simple.py
           python .github/scripts/deploy_simple.py
@@ -41,4 +41,4 @@ jobs:
         if: success()
         run: |
           echo "✅ 部署成功！"
-          echo "访问地址: https://${{ secrets.PA_DOMAIN }}"
+          echo "访问地址: https://${{ vars.PA_DOMAIN }}"

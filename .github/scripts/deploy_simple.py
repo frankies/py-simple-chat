@@ -208,7 +208,7 @@ def reload_webapp(domain):
     log("🔄", "重新加载应用...")
     
     # 先尝试使用 pa 命令
-    if run_pa_command(f'pa webapp reload {domain}'):
+    if run_pa_command(f'pa webapp reload -d {domain}'):
         log("✅", "应用重新加载成功")
         return True
     

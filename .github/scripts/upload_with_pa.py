@@ -238,7 +238,7 @@ def update_webapp_config(domain: str, project_path: str) -> None:
     data = {
         "source_directory": project_path,
         # "virtualenv_path": f"{project_path}/.venv",
-        "virtualenv_path": f"/home/frankies/.virtualenvs/py-simple-chat", ## 只能在console中/home/frankies/py-simple-chat目录下执行： uv venv ~/.virtualenvs/py-simple-chat 和 uv sync
+        "virtualenv_path": f"/home/frankies/.virtualenvs/py-simple-chat", ## 只能在console中/home/frankies/py-simple-chat目录下执行：  uv sync 和 cp -R .venv ~/.virtualenvs/py-simple-chat 和
     # }
     }
 

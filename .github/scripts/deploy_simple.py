@@ -70,19 +70,48 @@ def execute_in_console(commands):
     """在 PythonAnywhere 控制台执行命令"""
     log("🖥️", "创建临时控制台...")
     
-    # 创建 bash 控制台
-    resp = api_post('/consoles/', data={
-        'executable': '/bin/bash -l'
-    })
-    if not resp or resp.status_code not in [200, 201]:
-        log("❌", "无法创建控制台")
-        return False
-    
-    console_id = resp.json().get('id')
-    log("✅", f"控制台 ID: {console_id}")
-    
+    # 准备创建 bash 控制台
     api_token = os.environ.get('PA_API_TOKEN')
     username = os.environ.get('PA_USERNAME')
+    working_dir = f"/home/{username}" if username else None
+
+    console_data = {
+        'executable': '/bin/bash',
+        'arguments': '-l',
+    }
+    if working_dir:
+        console_data['working_directory'] = working_dir
+
+    # 创建 bash 控制台
+    resp = api_post('/consoles/', data=console_data)
+    if not resp or resp.status_code not in [200, 201]:
+        log("❌", "无法创建控制台")
+        if resp is not None:
+            try:
+                log("⚠️", f"控制台创建响应: {resp.text[:200]}")
+            except Exception:
+                pass
+        return False
+
+    # 解析返回的 JSON，获取 console_id
+    try:
+        console_info = resp.json()
+    except Exception as e:
+        log("❌", f"解析控制台创建响应失败: {e}")
+        try:
+            log("⚠️", f"原始响应内容: {resp.text[:200]}")
+        except Exception:
+            pass
+        return False
+
+    console_id = console_info.get('id')
+    if not console_id:
+        log("❌", "创建控制台响应中缺少 ID")
+        log("⚠️", f"完整响应: {console_info}")
+        return False
+
+    log("✅", f"控制台 ID: {console_id}")
+    
     base_url = f'https://www.pythonanywhere.com/api/v0/user/{username}'
     headers = {'Authorization': f'Token {api_token}'}
     

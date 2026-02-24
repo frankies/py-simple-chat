@@ -154,7 +154,7 @@ def execute_in_console(commands):
     finally:
         # 删除控制台
         try:
-         //   requests.delete(f'{base_url}/consoles/{console_id}/', headers=headers, timeout=30)
+       #  requests.delete(f'{base_url}/consoles/{console_id}/', headers=headers, timeout=30)
             log("🗑️", "控制台已清理")
         except:
             pass

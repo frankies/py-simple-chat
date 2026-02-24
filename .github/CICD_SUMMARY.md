@@ -56,7 +56,8 @@ GitHub Push → GitHub Actions → PythonAnywhere
 ├── workflows/
 │   └── deploy.yml              # GitHub Actions 主配置
 ├── scripts/
-│   └── deploy_to_pa.py         # Python 部署脚本
+│   ├── upload_with_pa.py       # 使用 uv + pa path upload 的部署脚本（当前推荐）
+│   └── deploy_to_pa.py         # 旧版部署脚本（保留以兼容历史，已不再由 CI 调用）
 ├── DEPLOY_GUIDE.md             # 快速部署指南
 └── CICD_SUMMARY.md             # 本文档
 
@@ -87,28 +88,22 @@ GitHub Actions 工作流配置：
   3. 安装 uv
   4. 安装 pythonanywhere CLI
   5. 配置 PA API Token
-  6. 执行部署脚本
-  7. 显示部署状态
-```
+   3. 安装 uv 与 pythonanywhere CLI（提供 `pa` 命令）
+   4. 执行 `uv sync` 生成 `.venv`
+   5. 运行 `.github/scripts/upload_with_pa.py`，通过 `pa path upload` 将整个项目目录（含 `.venv`）上传到 PythonAnywhere 的 `PA_PROJECT_PATH`
+   6. 尝试使用 `pa webapp reload` 重新加载应用（失败时仅告警，不中断部署）
+   7. 显示部署状态
 
-### 2. `.github/scripts/deploy_to_pa.py`
+### 2. `.github/scripts/upload_with_pa.py`
 
-智能部署脚本，处理：
+当前 CI/CD 使用的部署脚本，职责：
 
-- 检测项目是否存在
-- 检测 Web 应用是否存在
-- 首次部署：完整初始化
-- 后续部署：增量更新
-- 使用 uv 管理依赖
+- 假定 CI 中已执行 `uv sync`，本地生成 `.venv`
+- 遍历仓库根目录，跳过 `.git`、`.github`、`__pycache__`、`.pyc/.pyo`
+- 对每个文件执行 `pa path upload <remote_path> --contents <local_file>`，将代码和虚拟环境一并上传到 `PA_PROJECT_PATH`
+- 可选：在上传完成后调用 `pa webapp reload <PA_DOMAIN>` 尝试重载应用
 
-关键函数：
-- `check_project_exists()` - 检查项目目录
-- `check_webapp_exists()` - 检查 Web 应用
-- `clone_repository()` - 克隆仓库
-- `create_webapp()` - 创建 Web 应用
-- `install_dependencies()` - 使用 uv sync 安装依赖
-
-### 3. `pyproject.toml`
+> 说明：老的 `.github/scripts/deploy_to_pa.py` 和 `.github/scripts/deploy_simple.py` 仍保留在仓库中，方便参考/回滚，但 GitHub Actions 已不再调用它们。
 
 项目配置文件：
 

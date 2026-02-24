@@ -1,5 +1,12 @@
 # GitHub Actions 部署到 PythonAnywhere - 快速指南
 
+> 当前推荐的自动化部署路径：
+> - 在 CI 中使用 `uv sync` 生成 `.venv`
+> - 使用 PythonAnywhere CLI (`pa` 命令) 的 `pa path upload` 子命令，将整个项目目录（包含 `.venv`）上传到 `PA_PROJECT_PATH`
+> - 具体实现见 `.github/workflows/deploy.yml` 与 `.github/scripts/upload_with_pa.py`
+>
+> 说明：早期版本中的 `.github/scripts/deploy_simple.py` 与 `.github/scripts/deploy_to_pa.py` 已经废弃，仅保留做历史参考，GitHub Actions 不再调用它们。
+
 ## 重要说明
 
 ### pa 命令的限制

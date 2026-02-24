@@ -21,7 +21,7 @@ jobs:
 
       - name: Install tools (uv + pa)
         run: |
-          pip install "uv>=0.4.0" pythonanywhere
+          pip install "uv>=0.4.0" pythonanywhere requests
 
       - name: Build virtualenv with uv
         run: |

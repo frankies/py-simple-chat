@@ -21,7 +21,10 @@ The script:
 import os
 import sys
 import subprocess
+import tempfile
 from pathlib import Path
+
+import requests
 
 
 def log(prefix: str, message: str) -> None:
@@ -51,6 +54,37 @@ def run_pa_command(args, check: bool = True) -> subprocess.CompletedProcess:
         sys.exit(result.returncode)
 
     return result
+
+
+def api_request(method: str, endpoint: str, data=None):
+    """Call PythonAnywhere API using token/username from env.
+
+    Prefers PA_API_TOKEN/PA_USERNAME, falls back to API_TOKEN/USER.
+    """
+    api_token = os.environ.get("PA_API_TOKEN") or os.environ.get("API_TOKEN")
+    username = os.environ.get("PA_USERNAME") or os.environ.get("USER")
+    host = os.environ.get("PYTHONANYWHERE_SITE", "www.pythonanywhere.com")
+
+    if not api_token or not username:
+        log("⚠️", "缺少 API token 或用户名，无法调用 PythonAnywhere API 创建 Web 应用")
+        return None
+
+    base_url = f"https://{host}/api/v0/user/{username}"
+    url = f"{base_url}{endpoint}"
+    headers = {"Authorization": f"Token {api_token}"}
+
+    try:
+        if method == "GET":
+            resp = requests.get(url, headers=headers, timeout=30)
+        elif method == "POST":
+            # 使用 form-data 以兼容 webapps 创建接口
+            resp = requests.post(url, headers=headers, data=data, timeout=30)
+        else:
+            raise ValueError(f"不支持的 HTTP 方法: {method}")
+        return resp
+    except Exception as exc:  # 网络错误等
+        log("❌", f"API 请求失败: {exc}")
+        return None
 
 
 def upload_file(local_root: Path, local_file: Path, remote_root: str) -> None:
@@ -88,6 +122,87 @@ def upload_tree(repo_root: Path, remote_root: str) -> None:
             upload_file(repo_root, local_path, remote_root)
 
 
+def ensure_remote_directory(remote_root: str) -> None:
+    """Ensure that remote_root directory exists on PythonAnywhere.
+
+    If it does not exist, create it by uploading then deleting a dummy file.
+    """
+    log("🔍", f"检查远程目录是否存在: {remote_root}")
+
+    # If path exists (file or dir), pa path get will succeed
+    result = run_pa_command(["path", "get", remote_root], check=False)
+    if result.returncode == 0:
+        log("✅", "远程目录已存在")
+        return
+
+    log("📁", "远程目录不存在，准备创建...")
+
+    dummy_remote = str(Path(remote_root) / ".pa_dir_init").replace("\\", "/")
+
+    # Create a temporary empty local file, upload it, then delete it remotely
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        run_pa_command(["path", "upload", dummy_remote, "--contents", str(tmp_path)])
+        # Remove dummy file but keep directory
+        run_pa_command(["path", "delete", dummy_remote], check=False)
+        log("✅", "远程目录已创建")
+    finally:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+
+
+def ensure_webapp(domain: str) -> None:
+    """Ensure that the webapp for given domain exists; create via API if missing."""
+    if not domain:
+        return
+
+    log("🌐", f"检查 Web 应用是否存在: {domain}")
+
+    resp = api_request("GET", "/webapps/")
+    if not resp:
+        log("⚠️", "无法获取 Web 应用列表（可能是 API 权限或网络问题）")
+        return
+
+    if resp.status_code == 200:
+        try:
+            webapps = resp.json()
+        except Exception:
+            webapps = []
+
+        for app in webapps:
+            if app.get("domain_name") == domain:
+                log("✅", "Web 应用已存在")
+                return
+    else:
+        log("⚠️", f"获取 Web 应用列表失败: {resp.status_code} - {resp.text[:200]}")
+        return
+
+    log("🆕", "Web 应用不存在，尝试创建...")
+
+    python_version = os.environ.get("PYTHON_VERSION", "3.12")
+    python_ver = f"python{python_version.replace('.', '')}"
+
+    data = {
+        "domain_name": domain,
+        "python_version": python_ver,
+    }
+
+    create_resp = api_request("POST", "/webapps/", data=data)
+    if not create_resp:
+        log("❌", "创建 Web 应用失败（API 无响应）")
+        return
+
+    if create_resp.status_code in (200, 201):
+        log("✅", "Web 应用创建成功")
+    else:
+        log("❌", f"Web 应用创建失败: {create_resp.status_code} - {create_resp.text[:300]}")
+
+
 def maybe_reload_webapp(domain: str) -> None:
     if not domain:
         return
@@ -114,11 +229,16 @@ def main() -> None:
     log("📁", f"本地根目录: {repo_root}")
     log("📂", f"远程目录: {pa_project_path}")
 
-    # 可选：先清空远程目录（谨慎使用）
-    # run_pa_command(["path", "delete", pa_project_path], check=False)
+    # 1. 确保远程目录存在
+    ensure_remote_directory(pa_project_path)
 
+    # 2. 确保 Web 应用存在
+    ensure_webapp(pa_domain)
+
+    # 3. 上传整个项目目录（包含 .venv）
     upload_tree(repo_root, pa_project_path)
 
+    # 4. 重载 Web 应用（尽力而为）
     maybe_reload_webapp(pa_domain)
 
     log("✅", "项目上传完成")

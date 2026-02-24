@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Upload current project (including .venv) to PythonAnywhere using `pa path upload`.
+"""Upload current project code to PythonAnywhere using `pa path upload`.
 
 This script is intended to be run inside CI (GitHub Actions).
 It assumes that:
-- `uv sync` has already been run, so `.venv` exists.
+- `uv sync` has already been run in CI（用于验证依赖，虚拟环境本身不会被上传）。
 - `pythonanywhere` CLI (`pa` command) is installed and on PATH.
 - The following env vars are set:
   - API_TOKEN: PythonAnywhere API token
@@ -13,8 +13,8 @@ It assumes that:
 
 The script:
 1. Walks the repository root.
-2. Skips non-deployment directories like .git and .github.
-3. For every file, calls `pa path upload <remote_path> --contents <local_file>`.
+2. Skips non-deployment directories like .git, .github, .venv.
+3. For every remaining file, calls `pa path upload <remote_path> --contents <local_file>`.
 4. Optionally triggers `pa webapp reload` at the end.
 """
 
@@ -123,10 +123,11 @@ def upload_tree(repo_root: Path, remote_root: str) -> None:
     Skips:
     - .git
     - .github
+    - .venv
     - __pycache__
     - *.pyc, *.pyo
     """
-    skip_dirs = {".git", ".github", "__pycache__"}
+    skip_dirs = {".git", ".github", ".venv", "__pycache__"}
 
     for dirpath, dirnames, filenames in os.walk(repo_root):
         # Filter directories in-place

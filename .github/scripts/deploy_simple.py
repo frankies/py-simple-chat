@@ -142,7 +142,7 @@ def execute_in_console(commands):
         log("⏳", "等待命令执行完成（最多120秒）...")
         
         # 轮询获取输出
-        max_attempts = 40  # 约 2 分钟
+        max_attempts = 20  # 约 1 分钟
         output_text = ""
         
         for attempt in range(max_attempts):
@@ -212,7 +212,7 @@ def create_webapp_via_api(domain, python_version):
     # 使用 form data
     data = {
         'domain_name': domain,
-        'python_version': python_ver,
+        'python_version': python_ver
     }
     
     resp = api_post('/webapps/', data)
@@ -236,6 +236,7 @@ def update_webapp_config(domain, project_path):
     data = {
         'source_directory': project_path,
         'working_directory': project_path,
+        'virtualenv_path': f'{project_path}/.venv' # 可选：如果需要虚拟环境，可以指定路径
     }
     
     try:
@@ -346,7 +347,7 @@ def main():
     log("📦", "设置项目...")
     
     # 将所有命令合并为一个脚本
-    script = f"""cd ~ && (if [ -d py-simple-chat ]; then echo "=== 更新现有项目 ===" && cd py-simple-chat && git pull origin main; else echo "=== 克隆新项目 ===" && git clone https://github.com/frankies/py-simple-chat.git py-simple-chat && cd py-simple-chat; fi) && echo "=== 安装 uv ===" && (pip install --user uv || echo "uv 已安装") && echo "=== 同步依赖 ===" && uv sync && echo "=== 初始化数据文件 ===" && echo "=== 设置完成 ===" && echo "项目路径: $(pwd)" && echo "Python版本: $(python --version)" && echo "uv 版本: $(uv --version)" """
+    script = f"""cd ~ && (if [ -d py-simple-chat ]; then echo "=== 更新现有项目 ===" &&  git pull origin main; else echo "=== 克隆新项目 ===" && git clone https://github.com/frankies/py-simple-chat.git py-simple-chat; fi) && cd py-simple-chat && echo "=== 安装 uv ===" && (pip install --user uv || echo "uv 已安装") && echo "=== 同步依赖 ===" && uv sync && echo "=== 初始化数据文件 ===" && echo "=== 设置完成 ===" && echo "项目路径: $(pwd)" && echo "Python版本: $(python --version)" && echo "uv 版本: $(uv --version)" """
     
     commands = [script]
     

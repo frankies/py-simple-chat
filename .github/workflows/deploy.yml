@@ -19,23 +19,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install tools (uv + pa)
         run: |
-          pip install pythonanywhere requests
+          pip install "uv>=0.4.0" pythonanywhere
 
-      - name: Deploy to PythonAnywhere
+      - name: Build virtualenv with uv
+        run: |
+          uv sync
+
+      - name: Upload project to PythonAnywhere via pa
         env:
           API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
-          PA_USERNAME: ${{ vars.PA_USERNAME }}
+          USER: ${{ vars.PA_USERNAME }}
           PA_DOMAIN: ${{ vars.PA_DOMAIN }}
           PA_PROJECT_PATH: ${{ vars.PA_PROJECT_PATH }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          PYTHON_VERSION: '3.12'
-          USER: ${{ vars.PA_USERNAME }}
         run: |
-          chmod +x .github/scripts/deploy_simple.py
-          python .github/scripts/deploy_simple.py
+          python .github/scripts/upload_with_pa.py
 
       - name: Deployment Status
         if: success()

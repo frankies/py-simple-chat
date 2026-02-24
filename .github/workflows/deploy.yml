@@ -1,0 +1,51 @@
+name: Deploy to PythonAnywhere
+
+on:
+  push:
+    branches:
+      - main  # 当推送到 main 分支时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: |
+          pip install uv
+
+      - name: Install PythonAnywhere CLI
+        run: |
+          uv pip install pythonanywhere
+
+      - name: Configure PA CLI
+        env:
+          PA_API_TOKEN: ${{ secrets.PA_API_TOKEN }}
+        run: |
+          echo "$PA_API_TOKEN" | pa --set-token
+
+      - name: Deploy to PythonAnywhere
+        env:
+          PA_USERNAME: ${{ secrets.PA_USERNAME }}
+          PA_DOMAIN: ${{ secrets.PA_DOMAIN }}
+          PA_PROJECT_PATH: ${{ secrets.PA_PROJECT_PATH }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PYTHON_VERSION: '3.12'
+        run: |
+          chmod +x .github/scripts/deploy_to_pa.py
+          python .github/scripts/deploy_to_pa.py
+
+      - name: Deployment Status
+        if: success()
+        run: |
+          echo "✅ 部署成功！"
+          echo "访问地址: https://${{ secrets.PA_DOMAIN }}"

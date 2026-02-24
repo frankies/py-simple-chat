@@ -1,0 +1,22 @@
+# uv 配置文件示例
+# 复制此文件为 uv.toml 并根据需要修改
+
+[pip]
+# PyPI 镜像源配置（可选）
+# 中国大陆用户可以使用以下镜像加速下载
+
+# 清华大学镜像
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+# 或使用阿里云镜像
+# index-url = "https://mirrors.aliyun.com/pypi/simple/"
+
+# 或使用腾讯云镜像
+# index-url = "https://mirrors.cloud.tencent.com/pypi/simple"
+
+# 或使用华为云镜像
+# index-url = "https://mirrors.huaweicloud.com/repository/pypi/simple"
+
+[tool.uv]
+# 其他 uv 配置选项
+# 详见: https://docs.astral.sh/uv/configuration/

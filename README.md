@@ -32,24 +32,24 @@
 1. 安装依赖（推荐使用 uv）：
 
 ```bash
-uv venv
-uv pip install -r requirements.txt
+# 安装 uv
+pip install uv
+
+# 同步依赖
+uv sync
 ```
 
-如在中国大陆，建议使用国内 PyPI 镜像源加速依赖安装。例如：
+如在中国大陆，建议配置 PyPI 镜像源。可以在项目根目录创建 `uv.toml` 文件：
 
-- 清华大学镜像：
-    ```bash
-    uv pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-    ```
-- 阿里云镜像：
-    ```bash
-    uv pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-    ```
+```toml
+[pip]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+```
 
-也可直接用 pip：
+或使用环境变量：
 ```bash
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+export UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+uv sync
 ```
 
 ## Running Locally
@@ -66,7 +66,11 @@ uv  run gunicorn main:app
 2. 启动服务：
 
 ```bash
-uv run python app.py
+# 使用 uv 运行
+uv run python main.py
+
+# 或者激活虚拟环境后运行
+python main.py
 ```
 
 3. 访问页面：

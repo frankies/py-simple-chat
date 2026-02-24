@@ -131,12 +131,12 @@ def execute_in_console(commands):
             )
 
         # 发送 exit，提示控制台在脚本执行完后退出
-        requests.post(
-            f'{base_url}/consoles/{console_id}/send_input/',
-            headers=headers,
-            data={'input': 'exit\n'},
-            timeout=30
-        )
+        # requests.post(
+        #     f'{base_url}/consoles/{console_id}/send_input/',
+        #     headers=headers,
+        #     data={'input': 'exit\n'},
+        #     timeout=30
+        # )
         
         # 等待命令执行
         log("⏳", "等待命令执行完成（最多120秒）...")

@@ -346,7 +346,7 @@ def main():
     log("📦", "设置项目...")
     
     # 将所有命令合并为一个脚本
-    script = f"""cd ~ && (if [ -d py-simple-chat ]; then echo "=== 更新现有项目 ===" && cd py-simple-chat && git pull origin main; else echo "=== 克隆新项目 ===" && git clone https://github.com/frankies/py-simple-chat.git py-simple-chat && cd py-simple-chat; fi) && echo "=== 安装 uv ===" && (pip install --user uv || echo "uv 已安装") && echo "=== 同步依赖 ===" && uv sync && echo "=== 初始化数据文件 ===" && touch users.json friends.json ip_limit.json banned.json && ([ ! -s users.json ] && echo '{}' > users.json || echo "users.json 已存在") && ([ ! -s friends.json ] && echo '{}' > friends.json || echo "friends.json 已存在") && ([ ! -s ip_limit.json ] && echo '{}' > ip_limit.json || echo "ip_limit.json 已存在") && ([ ! -s banned.json ] && echo '{}' > banned.json || echo "banned.json 已存在") && chmod 644 *.json && echo "=== 设置完成 ===" && echo "项目路径: $(pwd)" && echo "Python版本: $(python --version)" && echo "uv 版本: $(uv --version)" """
+    script = f"""cd ~ && (if [ -d py-simple-chat ]; then echo "=== 更新现有项目 ===" && cd py-simple-chat && git pull origin main; else echo "=== 克隆新项目 ===" && git clone https://github.com/frankies/py-simple-chat.git py-simple-chat && cd py-simple-chat; fi) && echo "=== 安装 uv ===" && (pip install --user uv || echo "uv 已安装") && echo "=== 同步依赖 ===" && uv sync && echo "=== 初始化数据文件 ===" && echo "=== 设置完成 ===" && echo "项目路径: $(pwd)" && echo "Python版本: $(python --version)" && echo "uv 版本: $(uv --version)" """
     
     commands = [script]
     

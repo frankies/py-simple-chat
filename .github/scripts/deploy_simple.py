@@ -30,41 +30,40 @@ def run_pa_command(cmd):
     
     return result.returncode == 0
 
-def api_call(method, endpoint, data=None):
-    """调用 PythonAnywhere API"""
+def api_get(endpoint):
+    """GET 请求"""
     api_token = os.environ.get('PA_API_TOKEN')
     username = os.environ.get('PA_USERNAME')
     url = f'https://www.pythonanywhere.com/api/v0/user/{username}{endpoint}'
     headers = {'Authorization': f'Token {api_token}'}
     
-    log("🔗", f"API 请求: {method} {url}")
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        return resp
+    except Exception as e:
+        log("❌", f"GET 请求失败: {e}")
+        return None
+
+def api_post(endpoint, data=None):
+    """POST 请求 - 使用 form data"""
+    api_token = os.environ.get('PA_API_TOKEN')
+    username = os.environ.get('PA_USERNAME')
+    url = f'https://www.pythonanywhere.com/api/v0/user/{username}{endpoint}'
+    headers = {'Authorization': f'Token {api_token}'}
+    
+    log("🔗", f"POST {url}")
     if data:
-        log("📋", f"请求数据: {data}")
+        log("📋", f"数据: {data}")
     
     try:
-        if method == 'GET':
-            resp = requests.get(url, headers=headers, timeout=30)
-        elif method == 'POST':
-            resp = requests.post(url, headers=headers, json=data, timeout=30)
-        elif method == 'PATCH':
-            resp = requests.patch(url, headers=headers, json=data, timeout=30)
-        
-        log("📊", f"响应状态: {resp.status_code}")
+        # 使用 data 参数发送 form-encoded 数据
+        resp = requests.post(url, headers=headers, data=data, timeout=30)
+        log("📊", f"状态: {resp.status_code}")
         if resp.status_code >= 400:
-            log("⚠️", f"响应内容: {resp.text}")
-        
+            log("⚠️", f"响应: {resp.text}")
         return resp
-    except requests.exceptions.Timeout as e:
-        log("❌", f"请求超时: {e}")
-        return None
-    except requests.exceptions.ConnectionError as e:
-        log("❌", f"连接错误: {e}")
-        return None
-    except requests.exceptions.RequestException as e:
-        log("❌", f"请求异常: {e}")
-        return None
     except Exception as e:
-        log("❌", f"未知错误: {type(e).__name__}: {e}")
+        log("❌", f"POST 请求失败: {e}")
         return None
 
 def execute_in_console(commands):
@@ -72,7 +71,7 @@ def execute_in_console(commands):
     log("🖥️", "创建临时控制台...")
     
     # 创建控制台
-    resp = api_call('POST', '/consoles/')
+    resp = api_post('/consoles/')
     if not resp or resp.status_code not in [200, 201]:
         log("❌", "无法创建控制台")
         return False
@@ -80,18 +79,32 @@ def execute_in_console(commands):
     console_id = resp.json().get('id')
     log("✅", f"控制台 ID: {console_id}")
     
+    api_token = os.environ.get('PA_API_TOKEN')
+    username = os.environ.get('PA_USERNAME')
+    base_url = f'https://www.pythonanywhere.com/api/v0/user/{username}'
+    headers = {'Authorization': f'Token {api_token}'}
+    
     try:
         # 执行命令
         for cmd in commands:
             log("📤", f"执行: {cmd}")
-            api_call('POST', f'/consoles/{console_id}/send_input/', {'input': cmd + '\n'})
+            requests.post(
+                f'{base_url}/consoles/{console_id}/send_input/',
+                headers=headers,
+                data={'input': cmd + '\n'},
+                timeout=30
+            )
             time.sleep(2)
         
         # 等待执行完成
         time.sleep(3)
         
         # 获取输出
-        resp = api_call('GET', f'/consoles/{console_id}/get_latest_output/')
+        resp = requests.get(
+            f'{base_url}/consoles/{console_id}/get_latest_output/',
+            headers=headers,
+            timeout=30
+        )
         if resp and resp.status_code == 200:
             output = resp.json().get('output', '')
             if output:
@@ -102,10 +115,7 @@ def execute_in_console(commands):
         return True
     finally:
         # 删除控制台
-        requests.delete(
-            f'https://www.pythonanywhere.com/api/v0/user/{os.environ.get("PA_USERNAME")}/consoles/{console_id}/',
-            headers={'Authorization': f'Token {os.environ.get("PA_API_TOKEN")}'}
-        )
+        requests.delete(f'{base_url}/consoles/{console_id}/', headers=headers, timeout=30)
         log("🗑️", "控制台已清理")
 
 def create_webapp_via_api(domain, python_version):
@@ -115,44 +125,45 @@ def create_webapp_via_api(domain, python_version):
     # Python 版本格式：python312, python310 等
     python_ver = f'python{python_version.replace(".", "")}'
     
+    # 使用 form data
     data = {
         'domain_name': domain,
         'python_version': python_ver,
     }
     
-    log("📋", f"请求数据: {data}")
+    resp = api_post('/webapps/', data)
     
-    resp = api_call('POST', '/webapps/', data)
-    
-    if resp:
-        log("�", f"响应状态: {resp.status_code}")
-        
-        if resp.status_code in [200, 201]:
-            log("✅", "Web 应用创建成功")
-            return True
-        else:
-            log("❌", f"创建失败: {resp.text}")
-            return False
+    if resp and resp.status_code in [200, 201]:
+        log("✅", "Web 应用创建成功")
+        return True
     else:
-        log("❌", "API 请求无响应")
+        log("❌", f"创建失败")
         return False
 
 def update_webapp_config(domain, project_path):
     """更新 Web 应用配置"""
     log("⚙️", "更新 Web 应用配置...")
     
+    api_token = os.environ.get('PA_API_TOKEN')
+    username = os.environ.get('PA_USERNAME')
+    url = f'https://www.pythonanywhere.com/api/v0/user/{username}/webapps/{domain}/'
+    headers = {'Authorization': f'Token {api_token}'}
+    
     data = {
         'source_directory': project_path,
         'working_directory': project_path,
     }
     
-    resp = api_call('PATCH', f'/webapps/{domain}/', data)
-    
-    if resp and resp.status_code == 200:
-        log("✅", "配置更新成功")
-        return True
-    else:
-        log("⚠️", f"配置更新失败: {resp.text if resp else 'No response'}")
+    try:
+        resp = requests.patch(url, headers=headers, json=data, timeout=30)
+        if resp.status_code == 200:
+            log("✅", "配置更新成功")
+            return True
+        else:
+            log("⚠️", f"配置更新失败: {resp.text}")
+            return False
+    except Exception as e:
+        log("❌", f"配置更新错误: {e}")
         return False
 
 def update_wsgi_file(domain, project_path):
@@ -203,13 +214,13 @@ def reload_webapp(domain):
     
     # 如果 pa 命令失败，使用 API
     log("🔄", "尝试通过 API 重新加载...")
-    resp = api_call('POST', f'/webapps/{domain}/reload/')
+    resp = api_post(f'/webapps/{domain}/reload/')
     
     if resp and resp.status_code == 200:
         log("✅", "应用重新加载成功")
         return True
     else:
-        log("⚠️", f"重新加载失败: {resp.text if resp else 'No response'}")
+        log("⚠️", "重新加载失败")
         return False
 
 def main():
@@ -255,7 +266,7 @@ def main():
     
     # 2. 检查 webapp 是否存在
     log("🌐", "检查 Web 应用...")
-    resp = api_call('GET', '/webapps/')
+    resp = api_get('/webapps/')
     webapp_exists = False
     
     if resp and resp.status_code == 200:

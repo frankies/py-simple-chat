@@ -237,7 +237,9 @@ def update_webapp_config(domain: str, project_path: str) -> None:
 
     data = {
         "source_directory": project_path,
-        "virtualenv_path": f"{project_path}/.venv",
+        # "virtualenv_path": f"{project_path}/.venv",
+        "virtualenv_path": f"/home/frankies/.virtualenvs/py-simple-chat", ## 只能在console中/home/frankies/py-simple-chat目录下执行： uv venv ~/.virtualenvs/py-simple-chat 和 uv sync
+    # }
     }
 
     resp = api_request("PATCH", f"/webapps/{domain}/", data=data)
@@ -442,7 +444,8 @@ def main() -> None:
     upload_tree(repo_root, pa_project_path)
 
     # 3. 确保存在一个 uv sync 的定时任务（在 PythonAnywhere 上自动维护依赖）
-    ensure_uv_sync_schedule(pa_project_path)
+    # TODO: 免费账户可能没有 schedule 权限，后续可以改为直接调用 API 执行命令（如果有权限的话），或者在部署日志中提醒用户手动执行一次 uv sync。
+    #ensure_uv_sync_schedule(pa_project_path)
     
     # 4. 确保 Web 应用存在
     ensure_webapp(pa_domain)

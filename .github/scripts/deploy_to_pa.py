@@ -1,64 +1,106 @@
 #!/usr/bin/env python3
 """
 PythonAnywhere 自动部署脚本
-处理首次部署和后续更新
+使用 pythonanywhere-core 库和 pa 命令行工具
 """
 
 import os
 import sys
 import subprocess
-import json
 
-def run_command(cmd, check=True):
-    """执行命令并返回结果"""
-    print(f"🔧 执行: {cmd}")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+def log(emoji, message):
+    """打印日志"""
+    print(f"{emoji} {message}")
+
+def run_pa_command(command, check=True):
+    """执行 pa 命令"""
+    log("🔧", f"执行: {command}")
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    
+    if result.stdout:
+        print(result.stdout)
+    if result.stderr:
+        print(result.stderr, file=sys.stderr)
+    
     if check and result.returncode != 0:
-        print(f"❌ 错误: {result.stderr}")
+        log("❌", f"命令执行失败，退出码: {result.returncode}")
         sys.exit(1)
+    
     return result
 
-def pa_exec(command):
-    """在 PythonAnywhere 上执行命令"""
-    return run_command(f'pa exec "{command}"', check=False)
-
-def check_project_exists(project_path):
-    """检查项目目录是否存在"""
-    result = pa_exec(f"test -d {project_path}")
-    return result.returncode == 0
-
-def check_webapp_exists(domain):
-    """检查 Web 应用是否存在"""
-    result = run_command("pa webapps list", check=False)
-    return domain in result.stdout
-
-def clone_repository(repo_url, project_path):
-    """克隆 Git 仓库"""
-    print("📦 克隆仓库...")
+def main():
+    """主函数"""
+    # 从环境变量获取配置
+    api_token = os.environ.get('PA_API_TOKEN')
+    username = os.environ.get('PA_USERNAME')
+    domain = os.environ.get('PA_DOMAIN')
+    project_path = os.environ.get('PA_PROJECT_PATH')
+    repo_url = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY')}.git"
+    python_version = os.environ.get('PYTHON_VERSION', '3.12')
+    
+    if not all([api_token, username, domain, project_path]):
+        log("❌", "缺少必要的环境变量")
+        sys.exit(1)
+    
+    log("�", "开始部署到 PythonAnywhere...")
+    log("📋", f"用户名: {username}")
+    log("📋", f"域名: {domain}")
+    log("📋", f"项目路径: {project_path}")
+    log("📋", f"仓库: {repo_url}")
+    
+    # 设置环境变量供 pa 命令使用
+    env = os.environ.copy()
+    env['API_TOKEN'] = api_token
+    env['USER'] = username
+    
+    # 1. 检查项目是否存在，不存在则克隆
+    log("📦", "检查并设置项目...")
     project_name = os.path.basename(project_path)
-    pa_exec(f"cd ~ && git clone {repo_url} {project_name}")
     
-    # 初始化数据文件
-    print("📄 初始化数据文件...")
-    for file in ['users.json', 'friends.json', 'ip_limit.json', 'banned.json']:
-        pa_exec(f"cd {project_path} && echo '{{}}' > {file}")
-    pa_exec(f"cd {project_path} && chmod 644 *.json")
-
-def update_repository(project_path):
-    """更新 Git 仓库"""
-    print("🔄 更新代码...")
-    pa_exec(f"cd {project_path} && git pull origin main")
-
-def create_webapp(domain, python_version, project_path, username):
-    """创建 Web 应用"""
-    print("🌐 创建 Web 应用...")
-    run_command(f"pa webapps create --domain {domain} --python {python_version}")
+    check_cmd = f'pa exec "test -d {project_path} && echo EXISTS || echo NOT_EXISTS"'
+    result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True, env=env)
     
-    # 配置 WSGI 文件
-    print("⚙️  配置 WSGI 文件...")
-    wsgi_path = f"/var/www/{username.replace('.', '_')}_pythonanywhere_com_wsgi.py"
+    if "NOT_EXISTS" in result.stdout or result.returncode != 0:
+        log("📥", "克隆仓库...")
+        run_pa_command(f'pa exec "cd ~ && git clone {repo_url} {project_name}"', check=False)
+        
+        # 初始化数据文件
+        log("📄", "初始化数据文件...")
+        init_commands = [
+            f'pa exec "cd {project_path} && touch users.json friends.json ip_limit.json banned.json"',
+            f'pa exec "cd {project_path} && echo \'{{}}\' > users.json"',
+            f'pa exec "cd {project_path} && echo \'{{}}\' > friends.json"',
+            f'pa exec "cd {project_path} && echo \'{{}}\' > ip_limit.json"',
+            f'pa exec "cd {project_path} && echo \'{{}}\' > banned.json"',
+            f'pa exec "cd {project_path} && chmod 644 *.json"',
+        ]
+        for cmd in init_commands:
+            run_pa_command(cmd, check=False)
+    else:
+        log("✅", "项目已存在，更新代码...")
+        run_pa_command(f'pa exec "cd {project_path} && git pull origin main"', check=False)
     
-    wsgi_content = f"""import sys
+    # 2. 安装 uv 和依赖
+    log("📚", "安装 uv...")
+    run_pa_command(f'pa exec "pip install --user uv"', check=False)
+    
+    log("📦", "同步依赖...")
+    run_pa_command(f'pa exec "cd {project_path} && uv sync"', check=False)
+    
+    # 3. 检查并创建 Web 应用
+    log("🌐", "检查 Web 应用...")
+    check_webapp = f'pa webapp list'
+    result = subprocess.run(check_webapp, shell=True, capture_output=True, text=True, env=env)
+    
+    if domain not in result.stdout:
+        log("🆕", "创建 Web 应用...")
+        # 使用 pa webapp create 命令
+        create_cmd = f'pa webapp create --domain {domain} --python {python_version} --source-directory {project_path}'
+        run_pa_command(create_cmd, check=False)
+        
+        # 配置 WSGI 文件
+        log("⚙️", "配置 WSGI 文件...")
+        wsgi_content = f"""import sys
 import os
 
 project_home = '{project_path}'
@@ -69,64 +111,20 @@ os.environ['USE_MEMORY_STORAGE'] = '0'
 
 from main import app as application
 """
-    
-    # 写入 WSGI 文件
-    escaped_content = wsgi_content.replace("'", "'\\''")
-    pa_exec(f"echo '{escaped_content}' > {wsgi_path}")
-
-def install_dependencies(project_path):
-    """安装 Python 依赖"""
-    print("📚 安装 uv...")
-    pa_exec("pip install --user uv")
-    
-    print("📦 使用 uv 同步依赖...")
-    pa_exec(f"cd {project_path} && uv sync")
-
-def reload_webapp(domain):
-    """重新加载 Web 应用"""
-    print("🔄 重新加载应用...")
-    run_command(f"pa reload {domain}")
-
-def main():
-    # 从环境变量获取配置
-    username = os.environ.get('PA_USERNAME')
-    domain = os.environ.get('PA_DOMAIN')
-    project_path = os.environ.get('PA_PROJECT_PATH')
-    repo_url = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY')}.git"
-    python_version = os.environ.get('PYTHON_VERSION', '3.12')
-    
-    if not all([username, domain, project_path]):
-        print("❌ 缺少必要的环境变量")
-        sys.exit(1)
-    
-    print("🚀 开始部署到 PythonAnywhere...")
-    print(f"   用户名: {username}")
-    print(f"   域名: {domain}")
-    print(f"   项目路径: {project_path}")
-    
-    # 1. 检查并设置项目
-    if check_project_exists(project_path):
-        print("✅ 项目已存在，更新代码...")
-        update_repository(project_path)
+        # 写入 WSGI 文件
+        wsgi_path = f"/var/www/{username.replace('.', '_')}_pythonanywhere_com_wsgi.py"
+        escaped_content = wsgi_content.replace("'", "'\\''")
+        run_pa_command(f'pa exec "echo \'{escaped_content}\' > {wsgi_path}"', check=False)
     else:
-        print("📦 首次部署，克隆仓库...")
-        clone_repository(repo_url, project_path)
-    
-    # 2. 检查并创建 Web 应用
-    if check_webapp_exists(domain):
-        print("✅ Web 应用已存在")
-    else:
-        print("🆕 创建新的 Web 应用...")
-        create_webapp(domain, python_version, project_path, username)
-    
-    # 3. 安装依赖
-    install_dependencies(project_path)
+        log("✅", "Web 应用已存在")
     
     # 4. 重新加载应用
-    reload_webapp(domain)
+    log("🔄", "重新加载应用...")
+    reload_cmd = f'pa webapp reload {domain}'
+    run_pa_command(reload_cmd, check=False)
     
-    print("✅ 部署成功！")
-    print(f"🌐 访问地址: https://{domain}")
+    log("✅", "部署完成！")
+    log("🌐", f"访问地址: https://{domain}")
 
 if __name__ == '__main__':
     main()

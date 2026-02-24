@@ -1,5 +1,13 @@
 # GitHub Actions 部署到 PythonAnywhere - 快速指南
 
+## 工作原理
+
+本部署方案使用：
+- `pa` 命令行工具（pythonanywhere 包提供）
+- PythonAnywhere API Token 进行身份验证
+- `uv` 管理 Python 依赖
+- GitHub Actions 自动化部署流程
+
 ## 一、准备工作（3分钟）
 
 ### 1. 获取 PythonAnywhere API Token
@@ -49,6 +57,28 @@ GitHub Actions 会自动完成以下操作：
 访问你的应用：https://yourusername.pythonanywhere.com
 
 ## 常见问题
+
+### Q: pa 命令如何工作？
+
+A: `pa` 是 PythonAnywhere 官方 CLI 工具，通过以下方式使用：
+
+```bash
+# 需要设置环境变量
+export API_TOKEN="your_api_token"
+export USER="your_username"
+
+# 执行远程命令
+pa exec "cd ~/project && git pull"
+
+# 管理 webapp
+pa webapp list
+pa webapp create --domain yourusername.pythonanywhere.com --python 3.12
+pa webapp reload yourusername.pythonanywhere.com
+
+# 文件操作
+pa path get /home/username/file.txt
+pa path delete /home/username/old_file.txt
+```
 
 ### Q: SocketIO 连接失败？
 

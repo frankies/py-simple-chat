@@ -70,8 +70,10 @@ def execute_in_console(commands):
     """在 PythonAnywhere 控制台执行命令"""
     log("🖥️", "创建临时控制台...")
     
-    # 创建控制台
-    resp = api_post('/consoles/')
+    # 创建 bash 控制台
+    resp = api_post('/consoles/', data={
+        'executable': '/bin/bash -l'
+    })
     if not resp or resp.status_code not in [200, 201]:
         log("❌", "无法创建控制台")
         return False
@@ -100,12 +102,20 @@ def execute_in_console(commands):
                         timeout=30
                     )
                     time.sleep(0.5)  # 短暂延迟
+
+        # 发送 exit，提示控制台在脚本执行完后退出
+        requests.post(
+            f'{base_url}/consoles/{console_id}/send_input/',
+            headers=headers,
+            data={'input': 'exit\n'},
+            timeout=30
+        )
         
         # 等待命令执行
-        log("⏳", "等待命令执行完成（最多30秒）...")
+        log("⏳", "等待命令执行完成（最多120秒）...")
         
         # 轮询获取输出
-        max_attempts = 10
+        max_attempts = 40  # 约 2 分钟
         output_text = ""
         
         for attempt in range(max_attempts):
@@ -117,19 +127,25 @@ def execute_in_console(commands):
                 timeout=30
             )
             
-            if resp and resp.status_code == 200:
-                new_output = resp.json().get('output', '')
-                
-                # 如果有新输出
-                if new_output and new_output != output_text:
-                    output_text = new_output
-                    
-                    # 检查是否完成
-                    if '=== 设置完成 ===' in output_text:
-                        log("✅", "检测到完成标记")
-                        break
-                    
-                    log("�", f"获取输出中... ({attempt + 1}/{max_attempts})")
+            if not resp:
+                log("⚠️", f"第 {attempt + 1} 次获取输出: resp 为 None")
+                continue
+
+            if resp.status_code != 200:
+                log("⚠️", f"第 {attempt + 1} 次获取输出失败: {resp.status_code} - {resp.text[:200]}")
+                continue
+
+            new_output = resp.json().get('output', '')
+
+            # 累积输出，方便搜索完整标记
+            if new_output:
+                output_text += new_output
+                log("🔍", f"获取输出中... ({attempt + 1}/{max_attempts})，新增长度 {len(new_output)}")
+
+                # 检查是否完成
+                if '=== 设置完成 ===' in output_text:
+                    log("✅", "检测到完成标记")
+                    break
         
         # 显示输出
         if output_text:

@@ -146,17 +146,15 @@ def upload_tree(repo_root: Path, remote_root: str) -> None:
 def ensure_remote_directory(remote_root: str) -> None:
     """Ensure that remote_root directory exists on PythonAnywhere.
 
-    If it does not exist, create it by uploading then deleting a dummy file.
+    实现为：始终先删除该目录（若不存在则忽略错误），再通过占位文件方式重新创建，
+    确保是一个干净的部署目标目录。
     """
-    log("🔍", f"检查远程目录是否存在: {remote_root}")
+    log("📁", f"重置远程目录: {remote_root}")
 
-    # If path exists (file or dir), pa path get will succeed
-    result = run_pa_command(["path", "get", remote_root], check=False)
-    if result.returncode == 0:
-        log("✅", "远程目录已存在")
-        return
+    # 先尝试删除整个目录（无论是否存在），避免遗留旧文件
+    run_pa_command(["path", "delete", remote_root], check=False)
 
-    log("📁", "远程目录不存在，准备创建...")
+    log("📁", "创建新的远程目录...")
 
     dummy_remote = str(Path(remote_root) / ".pa_dir_init").replace("\\", "/")
 

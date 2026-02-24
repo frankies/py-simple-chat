@@ -121,6 +121,7 @@ def execute_in_console(commands):
             # 将整段多行脚本一次性发送，让 bash 自行按行解析
             script = cmd.strip() + "\n"
             log("📤", f"发送整段脚本 {i}/{len(commands)}，长度 {len(script)}")
+            log("📜", f"脚本内容:\n{script}")
 
             requests.post(
                 f'{base_url}/consoles/{console_id}/send_input/',

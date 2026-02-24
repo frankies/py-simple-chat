@@ -22,6 +22,8 @@ import os
 import sys
 import subprocess
 import tempfile
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -293,8 +295,14 @@ from main import app as application
         log("⚠️", f"WSGI 文件更新失败: {resp.status_code} - {resp.text[:300]}")
 
 
-def run_remote_uv_sync(project_path: str) -> None:
-    """Run `uv sync` on PythonAnywhere inside the project directory via Consoles API."""
+def ensure_uv_sync_schedule(project_path: str) -> None:
+    """Create a one-off schedule to run `uv sync`, then wait for it.
+
+    行为：
+    - 如果已存在同命令的定时任务，先删除它；
+    - 创建一个新的任务，触发时间为“当前时间的下一分钟”；
+    - 阻塞等待到该时间点之后一段缓冲时间（近似视为执行完成），然后删除该任务。
+    """
     if not project_path:
         return
 
@@ -304,85 +312,101 @@ def run_remote_uv_sync(project_path: str) -> None:
     host = env.get("PYTHONANYWHERE_SITE", "www.pythonanywhere.com")
 
     if not username or not api_token:
-        log("⚠️", "缺少用户名或 API token，跳过远程 uv sync")
+        log("⚠️", "缺少用户名或 API token，跳过 uv sync 定时任务创建")
         return
 
     base_url = f"https://{host}/api/v0/user/{username}"
     headers = {"Authorization": f"Token {api_token}"}
 
-    log("🖥️", "创建远程 Bash 控制台以执行 uv sync...")
+    cmd_str = f"cd {project_path} && uv sync"
+
+    # 1. 删除已有同命令的任务
     try:
-        resp = requests.post(
-            f"{base_url}/consoles/",
-            headers=headers,
-            data={
-                "executable": "/bin/bash",
-                "arguments": "-l",
-                "working_directory": project_path,
-            },
-            timeout=30,
-        )
+        resp_list = requests.get(f"{base_url}/schedule/", headers=headers, timeout=30)
     except Exception as exc:
-        log("⚠️", f"创建远程控制台失败: {exc}")
+        log("⚠️", f"获取定时任务列表失败: {exc}")
         return
 
-    if resp.status_code not in (200, 201):
-        log("⚠️", f"创建远程控制台失败: {resp.status_code} - {resp.text[:200]}")
-        return
-
-    try:
-        console_id = resp.json().get("id")
-    except Exception:
-        console_id = None
-
-    if not console_id:
-        log("⚠️", "创建控制台响应中缺少 id，跳过 uv sync")
-        return
-
-    log("✅", f"控制台已创建，ID: {console_id}")
-
-    # 在远程环境中安装 uv（如有需要）并执行 uv sync
-    script = "pip install --user uv || echo 'uv maybe already installed'\nuv sync\n"
-
-    try:
-        resp_send = requests.post(
-            f"{base_url}/consoles/{console_id}/send_input/",
-            headers=headers,
-            data={"input": script},
-            timeout=30,
-        )
-        log("📤", "已发送 uv sync 命令到远程控制台")
-        log("📊", f"send_input 响应: {resp_send.status_code} - {getattr(resp_send, 'text', '')[:300]}")
-
-        # 简单轮询几次输出，方便在日志里看到执行情况
-        for _ in range(6):  # 约 30 秒
-            try:
-                out_resp = requests.get(
-                    f"{base_url}/consoles/{console_id}/get_latest_output/",
-                    headers=headers,
-                    timeout=30,
-                )
-            except Exception:
-                break
-
-            if out_resp.status_code != 200:
-                break
-
-            output = out_resp.json().get("output", "")
-            if output:
-                print(output)
-            import time as _time
-            _time.sleep(5)
-    finally:
-        # 结束并清理控制台（尽力而为）
+    if resp_list.status_code == 200:
         try:
-            requests.delete(
-                f"{base_url}/consoles/{console_id}/",
-                headers=headers,
-                timeout=30,
-            )
+            tasks = resp_list.json()
         except Exception:
-            pass
+            tasks = []
+
+        for task in tasks:
+            if task.get("command") == cmd_str:
+                task_id = task.get("id")
+                if task_id is not None:
+                    log("🗑️", f"删除已存在的 uv sync 定时任务: {task_id}")
+                    try:
+                        requests.delete(f"{base_url}/schedule/{task_id}/", headers=headers, timeout=30)
+                    except Exception:
+                        pass
+    else:
+        log("⚠️", f"获取定时任务列表失败: {resp_list.status_code} - {resp_list.text[:200]}")
+        return
+
+    # 2. 计算“下一分钟”的时间
+    now = datetime.utcnow()
+    next_minute = now + timedelta(minutes=1)
+    hour = next_minute.hour
+    minute = next_minute.minute
+
+    log("🕒", f"创建新的 uv sync 定时任务，计划时间 (UTC): {hour:02d}:{minute:02d}")
+
+    data = {
+        "command": cmd_str,
+        "enabled": True,
+        "interval": "daily",
+        "hour": hour,
+        "minute": minute,
+        "description": "CI one-off uv sync",
+    }
+
+    try:
+        resp_create = requests.post(f"{base_url}/schedule/", headers=headers, data=data, timeout=30)
+    except Exception as exc:
+        log("⚠️", f"创建 uv sync 定时任务失败: {exc}")
+        return
+
+    if resp_create.status_code not in (200, 201):
+        log("⚠️", f"创建 uv sync 定时任务失败: {resp_create.status_code} - {resp_create.text[:300]}")
+        return
+
+    try:
+        task = resp_create.json()
+        task_id = task.get("id")
+    except Exception:
+        task_id = None
+
+    if task_id is None:
+        log("⚠️", "创建任务成功但未获取到任务 ID，无法等待执行")
+        return
+
+    log("✅", f"uv sync 定时任务已创建，ID: {task_id}")
+
+    # 3. 阻塞等待到计划时间之后一段时间（近似视为任务执行完成）
+    # 先睡到“下一分钟”
+    now = datetime.utcnow()
+    delay_to_start = (next_minute - now).total_seconds()
+    if delay_to_start > 0:
+        log("⏳", f"等待 {int(delay_to_start)} 秒直到 uv sync 任务开始...")
+        time.sleep(delay_to_start)
+
+    # 再给 uv sync 一些执行时间缓冲（默认 5 分钟，可视需要调整）
+    buffer_seconds = 300
+    log("⏳", f"再等待 {buffer_seconds} 秒以完成 uv sync...")
+    time.sleep(buffer_seconds)
+
+    # 4. 删除该任务，避免后续重复执行
+    try:
+        resp_del = requests.delete(f"{base_url}/schedule/{task_id}/", headers=headers, timeout=30)
+        if resp_del.status_code in (200, 204):
+            log("🗑️", "已删除 uv sync 定时任务（视为已执行完成）")
+        else:
+            log("⚠️", f"删除 uv sync 定时任务失败: {resp_del.status_code} - {resp_del.text[:200]}")
+    except Exception as exc:
+        log("⚠️", f"删除 uv sync 定时任务请求失败: {exc}")
 
 
 def maybe_reload_webapp(domain: str) -> None:
@@ -417,8 +441,8 @@ def main() -> None:
     # 2. 上传整个项目目录（不包含 .venv，只上传代码和资源）
     upload_tree(repo_root, pa_project_path)
 
-    # 3. 在平台目录下执行一次 uv sync，确保依赖就绪
-    run_remote_uv_sync(pa_project_path)
+    # 3. 确保存在一个 uv sync 的定时任务（在 PythonAnywhere 上自动维护依赖）
+    ensure_uv_sync_schedule(pa_project_path)
     
     # 4. 确保 Web 应用存在
     ensure_webapp(pa_domain)

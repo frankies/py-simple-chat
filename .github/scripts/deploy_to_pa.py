@@ -41,20 +41,26 @@ def api_request(method, endpoint, data=None, files=None):
     
     try:
         if method == 'GET':
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, timeout=30)
         elif method == 'POST':
             if files:
-                response = requests.post(url, headers=headers, files=files)
+                response = requests.post(url, headers=headers, files=files, timeout=30)
             else:
-                response = requests.post(url, headers=headers, json=data)
+                response = requests.post(url, headers=headers, json=data, timeout=30)
         elif method == 'PATCH':
-            response = requests.patch(url, headers=headers, json=data)
+            response = requests.patch(url, headers=headers, json=data, timeout=30)
         elif method == 'DELETE':
-            response = requests.delete(url, headers=headers)
+            response = requests.delete(url, headers=headers, timeout=30)
         
         return response
-    except Exception as e:
+    except requests.exceptions.Timeout:
+        log("❌", f"API 请求超时: {url}")
+        return None
+    except requests.exceptions.RequestException as e:
         log("❌", f"API 请求失败: {e}")
+        return None
+    except Exception as e:
+        log("❌", f"未知错误: {e}")
         return None
 
 def create_console():
@@ -133,8 +139,8 @@ def create_webapp_via_pa(domain, python_version):
     env['API_TOKEN'] = env.get('PA_API_TOKEN')
     env['USER'] = env.get('PA_USERNAME')
     
-    # 使用 pa webapp create 命令
-    cmd = f'pa webapp create --domain {domain} --python {python_version}'
+    # 使用 pa webapp create 命令（注意是 --python-version）
+    cmd = f'pa webapp create --domain {domain} --python-version {python_version}'
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=env)
     
     if result.returncode == 0:
@@ -149,18 +155,30 @@ def create_webapp_via_api(domain, python_version):
     """使用 API 创建 Web 应用"""
     log("🔄", "尝试通过 API 创建...")
     
+    # Python 版本格式：python312, python310 等
+    python_ver = f'python{python_version.replace(".", "")}'
+    
     data = {
         'domain_name': domain,
-        'python_version': f'python{python_version.replace(".", "")}',
+        'python_version': python_ver,
     }
+    
+    log("📋", f"API 请求数据: {data}")
     
     response = api_request('POST', '/webapps/', data)
     
-    if response and response.status_code in [200, 201]:
-        log("✅", "Web 应用创建成功")
-        return True
+    if response:
+        log("📋", f"API 响应状态: {response.status_code}")
+        log("📋", f"API 响应内容: {response.text}")
+        
+        if response.status_code in [200, 201]:
+            log("✅", "Web 应用创建成功")
+            return True
+        else:
+            log("❌", f"创建失败: {response.text}")
+            return False
     else:
-        log("❌", f"创建失败: {response.text if response else 'No response'}")
+        log("❌", "API 请求无响应")
         return False
 
 def reload_webapp(domain):

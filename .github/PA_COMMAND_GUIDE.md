@@ -54,7 +54,7 @@ export PYTHONANYWHERE_SITE="www.pythonanywhere.com"
 pa webapp list
 
 # 创建新的 web 应用
-pa webapp create --domain yourusername.pythonanywhere.com --python 3.12
+pa webapp create --domain yourusername.pythonanywhere.com --python-version 3.12
 
 # 重新加载 web 应用
 pa webapp reload yourusername.pythonanywhere.com
@@ -203,7 +203,7 @@ requests.delete(f"{base_url}/consoles/{console_id}/", headers=headers)
 
 ```bash
 # 创建 web 应用
-pa webapp create --domain yourusername.pythonanywhere.com --python 3.12
+pa webapp create --domain yourusername.pythonanywhere.com --python-version 3.12
 
 # 重新加载应用
 pa webapp reload yourusername.pythonanywhere.com

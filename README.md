@@ -1,124 +1,40 @@
 # py-simple-chat
 
-一个基于 Flask 和 Flask-SocketIO 的简单聊天室项目。
+A simple Pygame-based alien invasion game.
 
-## 功能
-- 用户注册、登录
-- 公共聊天、私聊
-- 好友添加与请求
-- 管理员功能：禁言、踢人、封号
-- 在线用户显示
+## Installation
 
-## 依赖环境
-- Python 3.7+
-- Flask
-- Flask-SocketIO
-- uv（推荐用于依赖管理和安装）
-
-
-## 环境准备
-
-1. 安装 Python 3.7 及以上版本（可从 https://www.python.org/downloads/ 下载并安装）。
-2. 安装 uv（推荐，需先安装 Python）：
-
-    Windows 下可在命令行执行：
-    ```bash
-    pip install uv
-    ```
-    更多 uv 详情见：https://github.com/astral-sh/uv
-
-## 快速开始
-
-1. 安装依赖（推荐使用 uv）：
+Use the `uv` environment commands:
 
 ```bash
-# 安装 uv
-pip install uv
-
-# 同步依赖
-uv sync
+uv install          # install dependencies in the venv
 ```
 
-如在中国大陆，建议配置 PyPI 镜像源。可以在项目根目录创建 `uv.toml` 文件：
-
-```toml
-[pip]
-index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-```
-
-或使用环境变量：
-```bash
-export UV_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
-uv sync
-```
-
-## Running Locally
+You can also install the project globally using pip:
 
 ```bash
-npm i -g vercel
-python -m venv .venv
-source .venv/bin/activate
-pip instal uv
-uv sync  # or alternatively pip install flask gunicorn
-uv  run gunicorn main:app
+pip install .
 ```
 
-2. 启动服务：
+## Running the game
+
+Launch via the script or directly:
 
 ```bash
-# 使用 uv 运行
-uv run python main.py
-
-# 或者激活虚拟环境后运行
-python main.py
+uv run py-simple-chat   # within the uv environment
+# or
+python -m main          # when installed or from project root
 ```
 
-3. 访问页面：
+Alternatively the legacy entry point:
 
-浏览器打开 http://localhost:5000
-
-## 部署到 PythonAnywhere
-
-本项目支持通过 GitHub Actions 自动部署到 PythonAnywhere。
-
-### 快速开始
-
-1. **配置 GitHub Secrets 和 Variables**
-   - Secret（加密）: `PA_API_TOKEN` - PythonAnywhere API Token
-   - Variables（普通）:
-     - `PA_USERNAME` - PythonAnywhere 用户名
-     - `PA_DOMAIN` - 域名（如：username.pythonanywhere.com）
-     - `PA_PROJECT_PATH` - 项目路径（如：/home/username/py-simple-chat）
-
-2. **首次部署**
-   - 推荐：先手动创建 Web 应用（见 [手动设置指南](.github/MANUAL_SETUP.md)）
-   - 或：推送代码尝试自动创建（可能失败于免费账户）
-
-3. **后续更新**
-   - 推送代码到 main 分支自动部署
-   - 自动更新代码和依赖
-   - 自动重新加载应用
-
-详细说明：
-- [快速部署指南](.github/DEPLOY_GUIDE.md)
-- [手动设置指南](.github/MANUAL_SETUP.md)
-- [完整部署文档](DEPLOYMENT.md)
-
-## 目录结构
-
-```
-app.py
-requirements.txt
-.gitignore
-.gitattributes
-templates/
-    index.html
+```bash
+uv run python game.py
 ```
 
-## 说明
-- 用户、好友、封禁等数据以 json 文件存储在项目根目录。
-- 管理员用户名为 `admin`，可在 app.py 中修改。
+## Controls
 
----
+- Arrow keys: move ship
+- Space: fire bullets
 
-如需自定义或扩展功能，请参考 app.py 代码。
+Have fun!

@@ -1,7 +1,9 @@
 # py-simple-chat
 
 A simple Pygame-based alien invasion game.
+## Web UI edition
 
+A new web-based front end has been added. Run the server with `python -m webapp.app` and open http://localhost:5000 in your browser. The game logic has been ported to JavaScript and draws on an HTML5 canvas, while Python now only serves static assets.
 ## Installation
 
 Use the `uv` environment commands:

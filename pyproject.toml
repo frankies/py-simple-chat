@@ -1,11 +1,12 @@
 [project]
 name = "py-simple-chat"
 version = "0.1.0"
-description = "A simple pygame-based alien invasion game"
+description = "A simple pygame-based alien invasion game (now with Web UI)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pygame>=2.1.0"
+    "pygame>=2.1.0",
+    "Flask>=2.0"
 ]
 
 [project.scripts]
